@@ -1,4 +1,4 @@
-﻿# ChainTrace: Sovereign Blockchain Forensics Platform
+# ChainTrace: Sovereign Blockchain Forensics Platform
 
 **ChainTrace** is an enterprise-grade Cyber Forensics and Intelligence platform engineered specifically for Law Enforcement Agencies (LEAs). It enables investigators to track illicit cryptocurrency transactions across multiple blockchains, manage cybercrime case dockets, and generate statutory compliance evidence logs under the latest digital evidence laws.
 
@@ -32,7 +32,7 @@ ChainTrace utilizes a robust, dual-mode **Backend-For-Frontend (BFF)** architect
 - **Database:** Supabase (Cloud PostgreSQL) with an automated fallback to a Local File Persistence Engine (JSON) for maximum uptime during network outages.
 
 ### Zero-Friction Middleware
-The Express backend is seamlessly mounted directly into Vite's server middleware (cbfisApiPlugin). This intercepts /api/* requests on port 8443 without requiring secondary terminals or external network routing, making deployment entirely frictionless.
+The Express backend is seamlessly mounted directly into Vite's server middleware (`cbfisApiPlugin`). This intercepts `/api/*` requests on port `8443` without requiring secondary terminals or external network routing, making deployment entirely frictionless.
 
 ---
 
@@ -53,11 +53,10 @@ ChainTrace is built in strict alignment with India's criminal and evidentiary co
 
 ### Prerequisites
 - Node.js 20+ (Node 22 or 24 recommended)
-- pnpm or 
-pm
+- `pnpm` or `npm`
 
 ### Installation
-\\\ash
+```bash
 # Clone the repository
 git clone https://github.com/bansalayush475/ChainTrace.git
 cd ChainTrace
@@ -65,35 +64,35 @@ cd ChainTrace
 # Install dependencies
 pnpm install
 # or: npm install
-\\\
+```
 
 ### Configuration (Supabase Cloud Database)
 Copy the environment template:
-\\\ash
+```bash
 cp .env.example .env
-\\\
+```
 1. Create a project at [supabase.com](https://supabase.com).
-2. Open the **SQL Editor** in your Supabase dashboard and run the schema defined in \supabase/schema.sql\.
-3. Set your project URL and Anon Key in \.env\:
-\\\env
+2. Open the **SQL Editor** in your Supabase dashboard and run the schema defined in `supabase/schema.sql`.
+3. Set your project URL and Anon Key in `.env`:
+```env
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
-\\\
-*(If left blank, ChainTrace operates smoothly in Local Sovereign Mode via \server/data/db.json\).*
+```
+*(If left blank, ChainTrace operates smoothly in Local Sovereign Mode via `server/data/db.json`).*
 
 ### Running the Platform
-\\\ash
+```bash
 # Start Vite development server (frontend + integrated Express API on port 8443)
 pnpm dev
 # or: npm run dev
-\\\
-Open **\http://localhost:8443\** in your browser.
+```
+Open **`http://localhost:8443`** in your browser.
 
 ---
 
 ## 📁 Project Structure
 
-\\\	ext
+```text
 ChainTrace/
 ├── .env.example                     # Environment configuration template
 ├── package.json                     # Project manifest and scripts
@@ -115,7 +114,7 @@ ChainTrace/
     ├── pages/                       # Investigation consoles and dashboards
     ├── services/                    # API and Database clients
     └── store/                       # Zustand global state management
-\\\
+```
 
 ---
 
