@@ -1,0 +1,29 @@
+{
+  "users": [],
+  "investigations": [],
+  "timeline_events": [],
+  "evidence": [],
+  "wallets": [],
+  "transactions": [],
+  "ncrp_complaints": [],
+  "freeze_notices": [],
+  "audit_logs": [
+    {
+      "id": "LOG-1791543882079-270",
+      "timestamp": "2026-10-09T11:04:42.079Z",
+      "user": "Ayush",
+      "action": "USER_REGISTER",
+      "resource": "bansalayush475@gmail.com",
+      "ip": "127.0.0.1",
+      "session": "SESSION-SOVEREIGN-MHA",
+      "details": "Registered new law enforcement account: Ayush (test · Team: test)",
+      "integrityHash": null,
+      "integrity_hash": null
+    }
+  ],
+  "meta": {
+    "initializedAt": "2026-10-09T07:03:01.192Z",
+    "version": "2.0.0",
+    "authority": "Ministry of Home Affairs (I4C) Sovereign Cyber Node"
+  }
+}
