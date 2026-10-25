@@ -74,6 +74,7 @@ export default function InvestigationDetailPage() {
     wallets,
     transactions,
     timelineEvents,
+    reports,
     addTransaction,
     addEvidence,
     addTimelineEvent,
@@ -972,52 +973,119 @@ export default function InvestigationDetailPage() {
       )}
 
       {activeTab === 'reports' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', padding: '48px 24px', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: '8px' }}>
-          <FileText size={48} style={{ color: isSenior ? '#d69e2e' : 'var(--accent)' }} />
-          
-          {isSenior ? (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ background: 'rgba(214,158,46,0.15)', border: '1px solid #d69e2e', color: '#d69e2e', borderRadius: '4px', padding: '3px 8px', fontSize: '11px', fontWeight: 700 }}>
-                  ⚖️ LEVEL-4 CERTIFIED DOSSIER
-                </span>
-                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Court Admissible Evidence Package</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Case Dossier Generator Banner */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', padding: '40px 24px', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+            <FileText size={48} style={{ color: isSenior ? '#d69e2e' : 'var(--accent)' }} />
+            
+            {isSenior ? (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ background: 'rgba(214,158,46,0.15)', border: '1px solid #d69e2e', color: '#d69e2e', borderRadius: '4px', padding: '3px 8px', fontSize: '11px', fontWeight: 700 }}>
+                    ⚖️ LEVEL-4 CERTIFIED DOSSIER
+                  </span>
+                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Court Admissible Evidence Package</span>
+                </div>
+                <h3 style={{ margin: '4px 0 0', color: 'var(--text-primary)', textAlign: 'center' }}>
+                  Generate Certified Judicial Evidence Report for {investigation.caseId}
+                </h3>
+                <p style={{ margin: 0, color: 'var(--text-secondary)', textAlign: 'center', maxWidth: '560px', fontSize: '13px', lineHeight: 1.5 }}>
+                  Compiles deterministic multi-hop fund traversal, suspect wallet risk profiling ({investigation.suspectWallet}), VASP attribution, and Section 63 BSA / Section 79A IT Act certified seals specifically for this case docket.
+                </p>
+                <button
+                  onClick={() => navigate(`/reports?case=${investigation.id}`)}
+                  style={{ padding: '12px 28px', background: '#d69e2e', border: 'none', borderRadius: '6px', color: '#1a202c', fontSize: '14px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                >
+                  <Printer size={16} /> Generate & Print {investigation.caseId} Dossier →
+                </button>
+              </>
+            ) : (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ background: 'rgba(237,137,54,0.15)', border: '1px solid #ed8936', color: '#ed8936', borderRadius: '4px', padding: '3px 8px', fontSize: '11px', fontWeight: 700 }}>
+                    📝 LEVEL-2 FIELD DRAFT
+                  </span>
+                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Working Exhibit for {investigation.caseId}</span>
+                </div>
+                <h3 style={{ margin: '4px 0 0', color: 'var(--text-primary)', textAlign: 'center' }}>
+                  Generate Analyst Working Exhibit for {investigation.caseId}
+                </h3>
+                <p style={{ margin: 0, color: 'var(--text-secondary)', textAlign: 'center', maxWidth: '560px', fontSize: '13px', lineHeight: 1.5 }}>
+                  Generates a case-specific field working draft with a prominent DRAFT watermark and multi-hop traversal proof.
+                </p>
+                <button
+                  onClick={() => navigate(`/reports?case=${investigation.id}`)}
+                  style={{ padding: '12px 28px', background: 'var(--accent)', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                >
+                  <Printer size={16} /> Generate Field Draft for {investigation.caseId} →
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Existing Reports for this Case */}
+          {(() => {
+            const caseReports = reports.filter(
+              (r) =>
+                r.investigationId === investigation.id ||
+                r.investigationId === investigation.caseId ||
+                r.investigation === investigation.title ||
+                (r.title && r.title.includes(investigation.caseId))
+            );
+
+            if (caseReports.length === 0) return null;
+
+            return (
+              <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '20px' }}>
+                <h4 style={{ margin: '0 0 14px', fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  Existing Certified Dossiers for Case {investigation.caseId} ({caseReports.length})
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {caseReports.map((rpt) => (
+                    <div
+                      key={rpt.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '12px 16px',
+                        background: 'var(--bg-elevated)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '6px',
+                        flexWrap: 'wrap',
+                        gap: '12px',
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text-primary)' }}>{rpt.title}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px', fontFamily: 'monospace' }}>
+                          {rpt.id} · {rpt.pages} Pages · Generated: {new Date(rpt.generatedAt).toLocaleDateString('en-IN')} · {rpt.status}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => navigate(`/reports?case=${investigation.id}`)}
+                        style={{
+                          padding: '6px 14px',
+                          background: 'var(--accent)',
+                          border: 'none',
+                          borderRadius: '4px',
+                          color: '#fff',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                        }}
+                      >
+                        <Printer size={12} /> View / Print PDF
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <h3 style={{ margin: '4px 0 0', color: 'var(--text-primary)', textAlign: 'center' }}>
-                Generate Certified Judicial Evidence Report
-              </h3>
-              <p style={{ margin: 0, color: 'var(--text-secondary)', textAlign: 'center', maxWidth: '480px', fontSize: '13px', lineHeight: 1.5 }}>
-                As Lead Investigator, generating this report includes cryptographic HMAC signatures, full chain-of-custody proofs, and warrant attestation ready for law enforcement submission.
-              </p>
-              <button
-                onClick={() => navigate(`/reports?case=${investigation.id}`)}
-                style={{ padding: '12px 28px', background: '#d69e2e', border: 'none', borderRadius: '6px', color: '#1a202c', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}
-              >
-                Generate Certified Dossier →
-              </button>
-            </>
-          ) : (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ background: 'rgba(237,137,54,0.15)', border: '1px solid #ed8936', color: '#ed8936', borderRadius: '4px', padding: '3px 8px', fontSize: '11px', fontWeight: 700 }}>
-                  📝 LEVEL-2 FIELD DRAFT
-                </span>
-                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Pending Senior Sign-Off</span>
-              </div>
-              <h3 style={{ margin: '4px 0 0', color: 'var(--text-primary)', textAlign: 'center' }}>
-                Generate Analyst Working Exhibit
-              </h3>
-              <p style={{ margin: 0, color: 'var(--text-secondary)', textAlign: 'center', maxWidth: '480px', fontSize: '13px', lineHeight: 1.5 }}>
-                Generates a field working draft with a prominent <strong style={{ color: '#ed8936' }}>DRAFT</strong> watermark. Final court certification must be authorized by Senior Lead Arjun Sharma.
-              </p>
-              <button
-                onClick={() => navigate(`/reports?case=${investigation.id}`)}
-                style={{ padding: '12px 28px', background: 'var(--accent)', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
-              >
-                Generate Field Draft →
-              </button>
-            </>
-          )}
+            );
+          })()}
         </div>
       )}
 
