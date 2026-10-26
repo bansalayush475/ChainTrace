@@ -9,6 +9,42 @@
   "freeze_notices": [],
   "audit_logs": [
     {
+      "id": "LOG-1792952053405-121",
+      "timestamp": "2026-10-25T18:14:13.405Z",
+      "user": "ayush",
+      "action": "LOGIN",
+      "resource": "SYSTEM",
+      "ip": "127.0.0.1",
+      "session": "SESSION-SOVEREIGN-MHA",
+      "details": "ayush (Lead Crypto Forensic Specialist · Team: Special Cell Cyber Operations (Northern Command)) authenticated via secure session",
+      "integrityHash": null,
+      "integrity_hash": null
+    },
+    {
+      "id": "LOG-1792863723157-931",
+      "timestamp": "2026-10-24T17:42:03.157Z",
+      "user": "bansalayush475@gmail.com",
+      "action": "MFA_OTP_DISPATCH",
+      "resource": "EMAIL_GATEWAY",
+      "ip": "127.0.0.1",
+      "session": "SESSION-SOVEREIGN-MHA",
+      "details": "Dispatched Section 79A IT Act compliant 6-digit MFA OTP to official mailbox bansalayush475@gmail.com (Delivery: SOVEREIGN_SIMULATED, Ref: LEA-NIC-4587E334)",
+      "integrityHash": null,
+      "integrity_hash": null
+    },
+    {
+      "id": "LOG-1792863693203-226",
+      "timestamp": "2026-10-24T17:41:33.203Z",
+      "user": "bansalayush475@gmail.com",
+      "action": "MFA_OTP_DISPATCH",
+      "resource": "EMAIL_GATEWAY",
+      "ip": "127.0.0.1",
+      "session": "SESSION-SOVEREIGN-MHA",
+      "details": "Dispatched Section 79A IT Act compliant 6-digit MFA OTP to official mailbox bansalayush475@gmail.com (Delivery: SOVEREIGN_SIMULATED, Ref: LEA-NIC-65CE0605)",
+      "integrityHash": null,
+      "integrity_hash": null
+    },
+    {
       "id": "LOG-1791543882079-270",
       "timestamp": "2026-10-09T11:04:42.079Z",
       "user": "Ayush",

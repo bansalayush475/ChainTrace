@@ -36,6 +36,8 @@ interface WalletNodeData {
   riskScore: number;
   balance: number;
   blockchain: string;
+  taintScore?: number;
+  isTaintMode?: boolean;
 }
 
 const entityColors: Record<string, string> = {
@@ -49,7 +51,16 @@ const entityColors: Record<string, string> = {
 };
 
 function WalletNode({ data }: { data: WalletNodeData }) {
-  const color = entityColors[data.entityType] ?? '#4a5568';
+  const taintColor =
+    (data.taintScore ?? 0) >= 80
+      ? '#ef4444'
+      : (data.taintScore ?? 0) >= 50
+      ? '#f97316'
+      : (data.taintScore ?? 0) >= 20
+      ? '#eab308'
+      : '#10b981';
+
+  const color = data.isTaintMode ? taintColor : entityColors[data.entityType] ?? '#4a5568';
   const riskColor = getRiskColor(data.riskScore);
 
   return (
@@ -60,14 +71,14 @@ function WalletNode({ data }: { data: WalletNodeData }) {
         borderRadius: '8px',
         padding: '10px 14px',
         minWidth: '160px',
-        boxShadow: `0 0 12px ${color}40, 0 2px 8px rgba(0,0,0,0.3)`,
+        boxShadow: `0 0 14px ${color}45, 0 2px 8px rgba(0,0,0,0.3)`,
         position: 'relative',
         overflow: 'hidden',
       }}
     >
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0, height: '2px',
-        background: color, opacity: 0.8,
+        background: color, opacity: 0.9,
         pointerEvents: 'none',
       }} />
       <Handle type="target" position={Position.Left} style={{ background: color, border: 'none', width: 8, height: 8 }} />
@@ -76,15 +87,15 @@ function WalletNode({ data }: { data: WalletNodeData }) {
         <span
           style={{
             fontSize: '9px',
-            fontWeight: 700,
+            fontWeight: 800,
             letterSpacing: '0.1em',
             padding: '2px 6px',
             borderRadius: '3px',
-            background: `${color}20`,
+            background: `${color}25`,
             color,
           }}
         >
-          {data.entityType}
+          {data.isTaintMode ? `TAINT ${data.taintScore}%` : data.entityType}
         </span>
         <span
           style={{
@@ -138,7 +149,8 @@ function computeGraphData(
   investigation?: Investigation,
   walletAddress?: string,
   investigationId?: string,
-  hopDepth?: number
+  hopDepth?: number,
+  isTaintMode?: boolean
 ) {
   let displayWallets: Wallet[] = [];
   let displayTxs: Transaction[] = [];
@@ -250,6 +262,20 @@ function computeGraphData(
       x = 260;
       y = 150;
     }
+
+    const taintScore =
+      w.entityType === 'SUSPECT'
+        ? 96
+        : w.entityType === 'MIXER'
+        ? 92
+        : w.entityType === 'INTERMEDIATE'
+        ? 64
+        : w.entityType === 'EXCHANGE'
+        ? 24
+        : w.entityType === 'VICTIM'
+        ? 0
+        : Math.min(100, Math.max(15, w.riskScore));
+
     return {
       id: w.address.toLowerCase(),
       type: 'wallet',
@@ -261,6 +287,8 @@ function computeGraphData(
         riskScore: w.riskScore,
         balance: w.balance,
         blockchain: w.blockchain,
+        taintScore,
+        isTaintMode,
       },
     };
   });
@@ -269,16 +297,30 @@ function computeGraphData(
 
   const edges: Edge[] = displayTxs
     .filter((t) => nodeAddresses.has(t.fromAddress.toLowerCase()) && nodeAddresses.has(t.toAddress.toLowerCase()))
-    .map((t, idx) => ({
-      id: `edge-${idx}`,
-      source: t.fromAddress.toLowerCase(),
-      target: t.toAddress.toLowerCase(),
-      label: `${t.amount.toFixed(2)} ${t.token}`,
-      style: { stroke: getRiskColor(t.riskScore), strokeWidth: 1.5 },
-      labelStyle: { fill: 'var(--text-secondary)', fontSize: 10 },
-      labelBgStyle: { fill: 'var(--bg-elevated)' },
-      animated: t.riskScore > 70,
-    }));
+    .map((t, idx) => {
+      const edgeTaint = t.riskScore;
+      const taintStroke =
+        edgeTaint >= 80 ? '#ef4444' : edgeTaint >= 50 ? '#f97316' : edgeTaint >= 20 ? '#eab308' : '#10b981';
+      return {
+        id: `edge-${idx}`,
+        source: t.fromAddress.toLowerCase(),
+        target: t.toAddress.toLowerCase(),
+        label: isTaintMode
+          ? `Taint ${t.riskScore}% (${t.amount.toFixed(2)} ${t.token})`
+          : `${t.amount.toFixed(2)} ${t.token}`,
+        style: {
+          stroke: isTaintMode ? taintStroke : getRiskColor(t.riskScore),
+          strokeWidth: isTaintMode ? 2.5 : 1.5,
+        },
+        labelStyle: {
+          fill: isTaintMode ? taintStroke : 'var(--text-secondary)',
+          fontSize: 10,
+          fontWeight: isTaintMode ? 700 : 500,
+        },
+        labelBgStyle: { fill: 'var(--bg-elevated)' },
+        animated: isTaintMode || t.riskScore > 70,
+      };
+    });
 
   return { nodes, edges, txCount: displayTxs.length, nodeCount: nodes.length };
 }
@@ -289,13 +331,14 @@ export default function TransactionGraph({ investigationId, walletAddress, compa
   const investigation = investigations.find((i) => i.id === investigationId);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isTaintMode, setIsTaintMode] = useState(false);
   const [selectedNode, setSelectedNode] = useState<WalletNodeData | null>(null);
   const [copiedAddr, setCopiedAddr] = useState(false);
   const [showExhibitModal, setShowExhibitModal] = useState(false);
 
   const { nodes: initialNodes, edges: initialEdges, txCount, nodeCount } = useMemo(
-    () => computeGraphData(wallets, transactions, investigation, walletAddress, investigationId, hopDepth),
-    [wallets, transactions, investigation, walletAddress, investigationId, hopDepth]
+    () => computeGraphData(wallets, transactions, investigation, walletAddress, investigationId, hopDepth, isTaintMode),
+    [wallets, transactions, investigation, walletAddress, investigationId, hopDepth, isTaintMode]
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -442,6 +485,28 @@ export default function TransactionGraph({ investigationId, walletAddress, compa
           gap: '8px',
         }}
       >
+        <button
+          onClick={() => setIsTaintMode(!isTaintMode)}
+          title="Toggle Multi-Hop Forensic Taint Analysis Heatmap"
+          style={{
+            background: isTaintMode ? 'rgba(239,68,68,0.2)' : 'var(--bg-elevated)',
+            border: `1px solid ${isTaintMode ? '#ef4444' : 'var(--border)'}`,
+            borderRadius: '6px',
+            padding: '5px 10px',
+            fontSize: '11px',
+            fontWeight: 700,
+            color: isTaintMode ? '#f87171' : 'var(--text-primary)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+          }}
+        >
+          <Zap size={13} style={{ color: isTaintMode ? '#ef4444' : 'var(--accent)' }} />
+          <span>{isTaintMode ? 'Taint Heatmap ON' : 'Taint Mode'}</span>
+        </button>
+
         <button
           onClick={() => setShowExhibitModal(true)}
           title="Export Court Forensic Exhibit with SHA-256 seal"
