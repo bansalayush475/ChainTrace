@@ -17,7 +17,7 @@ import {
   type Transaction,
   type TimelineEvent,
 } from "../data/mockData";
-import { calculateRiskScore, getDefaultRiskFactors } from "../utils/riskEngine";
+import { calculateRiskScore, getDefaultRiskFactors, calculateTransactionRiskScore } from "../utils/riskEngine";
 import {
   dbSaveInvestigation,
   dbDeleteInvestigation,
@@ -710,9 +710,21 @@ export const useStore = create<StoreState>((set, get) => ({
     })),
 
   addTransaction: (tx) => {
+    const computed = calculateTransactionRiskScore({
+      amount: tx.amount,
+      usdValue: tx.usdValue,
+      token: tx.token,
+      type: tx.type,
+      fromAddress: tx.fromAddress,
+      toAddress: tx.toAddress,
+      hash: tx.hash,
+      timestamp: tx.timestamp,
+    });
     const newTx: Transaction = {
       ...tx,
+      riskScore: tx.riskScore !== undefined && tx.riskScore > 0 ? tx.riskScore : computed.riskScore,
       confirmations: tx.confirmations ?? 12,
+      flags: tx.flags && tx.flags.length > 0 ? tx.flags : computed.flags,
     };
     const now = new Date().toISOString();
     const timelineEntry: TimelineEvent = {
@@ -842,8 +854,20 @@ export const useStore = create<StoreState>((set, get) => ({
 
     const newTransactions: Transaction[] = walletData.transactions.map((t, idx) => {
       const isEth = (t.token || "").toUpperCase().includes("ETH");
-      const isHighRisk = (isEth && t.amount >= 0.2) || t.amount >= 1000;
-      const score = isHighRisk ? Math.max(84, t.riskScore) : Math.min(65, t.riskScore);
+      const computed = calculateTransactionRiskScore({
+        amount: t.amount,
+        usdValue: t.usdValue,
+        token: t.token,
+        type: t.type,
+        direction: t.direction,
+        fromAddress: t.from,
+        toAddress: t.to,
+        hash: t.hash,
+        timestamp: t.timestamp,
+      });
+      const score = t.riskScore !== undefined && t.riskScore > 0 ? t.riskScore : computed.riskScore;
+      const flags = computed.flags.length > 0 ? computed.flags : [t.type, "ONCHAIN_VERIFIED"];
+
       return {
         hash: t.hash,
         fromAddress: t.from,
@@ -857,7 +881,7 @@ export const useStore = create<StoreState>((set, get) => ({
         fee: 0.0015,
         type: (t.type === "DEPOSIT" ? "EXCHANGE_DEPOSIT" : t.type === "PEEL" ? "TRANSFER" : "TRANSFER") as any,
         riskScore: score,
-        flags: isHighRisk ? [t.type, "HIGH_RISK_THRESHOLD", "ONCHAIN_VERIFIED"] : [t.type, "ONCHAIN_VERIFIED"],
+        flags,
       };
     });
 

@@ -27,7 +27,7 @@ import DataTable from '../components/ui/DataTable';
 import TransactionGraph from '../components/graph/TransactionGraph';
 import { walletClusters, exchangeAttributions } from '../data/mockData';
 import { useStore } from '../store/useStore';
-import { truncateAddress, getRiskColor, getDefaultRiskFactors, formatUSD } from '../utils/riskEngine';
+import { truncateAddress, getRiskColor, getDefaultRiskFactors, formatUSD, calculateTransactionRiskScore } from '../utils/riskEngine';
 import type { Transaction, Evidence } from '../data/mockData';
 
 const containerVariants = {
@@ -136,6 +136,23 @@ export default function InvestigationDetailPage() {
       }));
     }
   }, [investigation]);
+
+  useEffect(() => {
+    if (!showAddTxModal) return;
+    const numAmt = parseFloat(txForm.amount) || 0;
+    const usdVal = numAmt * (txForm.token === 'BTC' ? 68000 : txForm.token === 'ETH' ? 2650 : 1);
+    const result = calculateTransactionRiskScore({
+      amount: numAmt,
+      usdValue: usdVal,
+      token: txForm.token,
+      type: txForm.type,
+      direction: 'OUTGOING',
+      fromAddress: txForm.fromAddress,
+      toAddress: txForm.toAddress,
+      hash: txForm.hash,
+    });
+    setTxForm((prev) => ({ ...prev, riskScore: result.riskScore }));
+  }, [txForm.amount, txForm.token, txForm.type, txForm.toAddress, txForm.hash, showAddTxModal]);
 
   if (!investigation) {
     return (
@@ -279,7 +296,34 @@ export default function InvestigationDetailPage() {
     { key: 'type', label: 'Type', render: (v: unknown) => <StatusBadge status={String(v)} /> },
     { key: 'amount', label: 'Amount', render: (v: unknown, row: unknown) => <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '12px' }}>{(row as { amount: number; token: string }).amount.toFixed(4)} {(row as { amount: number; token: string }).token}</span>, sortable: true },
     { key: 'usdValue', label: 'USD Value', render: (v: unknown) => <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '12px' }}>{formatUSD(Number(v))}</span>, sortable: true },
-    { key: 'riskScore', label: 'Risk', render: (v: unknown) => <span style={{ color: getRiskColor(Number(v)), fontWeight: 700 }}>{String(v)}</span>, sortable: true },
+    {
+      key: 'riskScore',
+      label: 'Forensic Risk',
+      render: (v: unknown) => {
+        const score = Number(v);
+        const color = getRiskColor(score);
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ color, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', fontSize: '12.5px' }}>
+              {score}%
+            </span>
+            <span
+              style={{
+                fontSize: '9.5px',
+                fontWeight: 700,
+                padding: '2px 5px',
+                borderRadius: '3px',
+                background: score >= 80 ? 'rgba(239,68,68,0.15)' : score >= 60 ? 'rgba(249,115,22,0.15)' : 'rgba(56,161,105,0.15)',
+                color,
+              }}
+            >
+              {score >= 80 ? 'CRITICAL' : score >= 60 ? 'HIGH' : score >= 30 ? 'MEDIUM' : 'LOW'}
+            </span>
+          </div>
+        );
+      },
+      sortable: true,
+    },
     { key: 'timestamp', label: 'Time', render: (v: unknown) => <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{new Date(String(v)).toLocaleDateString()}</span>, sortable: true },
   ];
 
@@ -288,7 +332,17 @@ export default function InvestigationDetailPage() {
     if (!txForm.toAddress.trim()) return;
 
     const amt = parseFloat(txForm.amount) || 1;
-    const usdVal = amt * (txForm.token === 'BTC' ? 62000 : txForm.token === 'ETH' ? 3200 : 1);
+    const usdVal = amt * (txForm.token === 'BTC' ? 68000 : txForm.token === 'ETH' ? 2650 : 1);
+    const computed = calculateTransactionRiskScore({
+      amount: amt,
+      usdValue: usdVal,
+      token: txForm.token,
+      type: txForm.type,
+      direction: 'OUTGOING',
+      fromAddress: txForm.fromAddress.trim(),
+      toAddress: txForm.toAddress.trim(),
+      hash: txForm.hash,
+    });
 
     addTransaction({
       hash: txForm.hash || `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`,
@@ -302,8 +356,8 @@ export default function InvestigationDetailPage() {
       confirmations: 16,
       fee: 0.002,
       type: txForm.type,
-      riskScore: txForm.riskScore,
-      flags: ['MANUAL_CASE_RECORD'],
+      riskScore: txForm.riskScore || computed.riskScore,
+      flags: computed.flags.length > 0 ? computed.flags : ['MANUAL_CASE_RECORD'],
       investigationId: investigation?.id,
     });
 
@@ -1260,9 +1314,28 @@ export default function InvestigationDetailPage() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                  Risk Score ({txForm.riskScore}/100)
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                    Forensic Risk Assessment
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '12.5px', fontWeight: 800, color: getRiskColor(txForm.riskScore), fontFamily: 'JetBrains Mono, monospace' }}>
+                      {txForm.riskScore}%
+                    </span>
+                    <span
+                      style={{
+                        fontSize: '10px',
+                        fontWeight: 700,
+                        padding: '2px 6px',
+                        borderRadius: '3px',
+                        background: txForm.riskScore >= 80 ? 'rgba(239,68,68,0.15)' : txForm.riskScore >= 60 ? 'rgba(249,115,22,0.15)' : 'rgba(56,161,105,0.15)',
+                        color: getRiskColor(txForm.riskScore),
+                      }}
+                    >
+                      {txForm.riskScore >= 80 ? 'CRITICAL' : txForm.riskScore >= 60 ? 'HIGH' : txForm.riskScore >= 30 ? 'MEDIUM' : 'LOW'}
+                    </span>
+                  </div>
+                </div>
                 <input
                   type="range"
                   min="0"
@@ -1271,6 +1344,11 @@ export default function InvestigationDetailPage() {
                   onChange={(e) => setTxForm({ ...txForm, riskScore: parseInt(e.target.value) })}
                   style={{ width: '100%' }}
                 />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                  <span>0% Low / Merchant</span>
+                  <span>50% Moderate</span>
+                  <span>100% Critical Laundering</span>
+                </div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>

@@ -343,10 +343,30 @@ export default function WalletAnalysisPage() {
     },
     {
       key: 'riskScore',
-      label: 'Risk',
-      render: (v: unknown) => (
-        <span style={{ color: getRiskColor(Number(v)), fontWeight: 700 }}>{String(v)}</span>
-      ),
+      label: 'Forensic Risk',
+      render: (v: unknown) => {
+        const score = Number(v);
+        const color = getRiskColor(score);
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ color, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', fontSize: '12.5px' }}>
+              {score}%
+            </span>
+            <span
+              style={{
+                fontSize: '9.5px',
+                fontWeight: 700,
+                padding: '2px 5px',
+                borderRadius: '3px',
+                background: score >= 80 ? 'rgba(239,68,68,0.15)' : score >= 60 ? 'rgba(249,115,22,0.15)' : 'rgba(56,161,105,0.15)',
+                color,
+              }}
+            >
+              {score >= 80 ? 'CRITICAL' : score >= 60 ? 'HIGH' : score >= 30 ? 'MEDIUM' : 'LOW'}
+            </span>
+          </div>
+        );
+      },
       sortable: true,
     },
     {

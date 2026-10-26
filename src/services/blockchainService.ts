@@ -6,6 +6,7 @@
  * - Bitcoin: Blockstream Electrs API (UTXO & Satoshis)
  */
 import blockchainApi from './blockchainApiService';
+import { calculateTransactionRiskScore } from '../utils/riskEngine';
 
 export type BlockchainType = 'TRON' | 'ETH' | 'BTC' | 'POLYGON' | 'UNKNOWN';
 
@@ -167,10 +168,18 @@ export async function fetchTronWallet(address: string): Promise<LiveWalletData> 
         if (item.from) counterparties.add(item.from);
       }
 
-      // Compute heuristic risk score
-      let riskScore = 65;
-      if (amount > 10000) riskScore += 15;
-      if (isOut) riskScore += 10;
+      // Compute granular forensic risk score
+      const txRisk = calculateTransactionRiskScore({
+        amount,
+        usdValue: amount * (TOKEN_PRICES[token] || 1),
+        token,
+        type: isOut ? 'PEEL' : 'DEPOSIT',
+        direction: isOut ? 'OUTGOING' : 'INCOMING',
+        fromAddress: item.from,
+        toAddress: item.to,
+        hash: item.transaction_id,
+        timestamp: item.block_timestamp ? new Date(item.block_timestamp).toISOString() : undefined,
+      });
 
       txs.push({
         hash: item.transaction_id,
@@ -183,7 +192,7 @@ export async function fetchTronWallet(address: string): Promise<LiveWalletData> 
           ? new Date(item.block_timestamp).toISOString()
           : new Date().toISOString(),
         type: isOut ? 'PEEL' : 'DEPOSIT',
-        riskScore: Math.min(riskScore, 98),
+        riskScore: txRisk.riskScore,
         explorerUrl: `https://tronscan.org/#/transaction/${item.transaction_id}`,
         direction: isOut ? 'OUTGOING' : 'INCOMING',
       });
@@ -283,10 +292,17 @@ export async function fetchEthereumWallet(address: string): Promise<LiveWalletDa
         if (item.from) counterparties.add(item.from);
       }
 
-      const isHighRisk = (token === 'ETH' && amount >= 0.2) || usdValue >= 500;
-      const riskScore = isHighRisk
-        ? Math.min(84 + Math.floor(Math.min(usdValue / 100, 14)) + (isOut ? 2 : 0), 98)
-        : Math.max(25, Math.floor(35 + Math.min(usdValue / 20, 30)));
+      const txRisk = calculateTransactionRiskScore({
+        amount,
+        usdValue,
+        token,
+        type: isOut ? 'PEEL' : 'TRANSFER',
+        direction: isOut ? 'OUTGOING' : 'INCOMING',
+        fromAddress: item.from,
+        toAddress: item.to,
+        hash: item.hash,
+        timestamp: item.timeStamp ? new Date(Number(item.timeStamp) * 1000).toISOString() : undefined,
+      });
 
       txs.push({
         hash: item.hash,
@@ -300,7 +316,7 @@ export async function fetchEthereumWallet(address: string): Promise<LiveWalletDa
           : new Date().toISOString(),
         blockNumber: Number(item.blockNumber || 0),
         type: isOut ? 'PEEL' : 'TRANSFER',
-        riskScore: Math.min(riskScore, 99),
+        riskScore: txRisk.riskScore,
         explorerUrl: `https://etherscan.io/tx/${item.hash}`,
         direction: isOut ? 'OUTGOING' : 'INCOMING',
       });
@@ -383,10 +399,24 @@ export async function fetchBitcoinWallet(address: string): Promise<LiveWalletDat
 
       const amount = isOut ? outSum : inSum;
 
+      const fromAddr = isOut ? address : t.vin?.[0]?.prevout?.scriptpubkey_address || 'COINBASE';
+      const toAddr = isOut ? t.vout?.[0]?.scriptpubkey_address || 'OP_RETURN' : address;
+      const txRisk = calculateTransactionRiskScore({
+        amount,
+        usdValue: amount * TOKEN_PRICES.BTC,
+        token: 'BTC',
+        type: isOut ? 'PEEL' : 'TRANSFER',
+        direction: isOut ? 'OUTGOING' : 'INCOMING',
+        fromAddress: fromAddr,
+        toAddress: toAddr,
+        hash: t.txid,
+        timestamp: t.status?.block_time ? new Date(t.status.block_time * 1000).toISOString() : undefined,
+      });
+
       txs.push({
         hash: t.txid,
-        from: isOut ? address : t.vin?.[0]?.prevout?.scriptpubkey_address || 'COINBASE',
-        to: isOut ? t.vout?.[0]?.scriptpubkey_address || 'OP_RETURN' : address,
+        from: fromAddr,
+        to: toAddr,
         amount,
         token: 'BTC',
         usdValue: amount * TOKEN_PRICES.BTC,
@@ -394,7 +424,7 @@ export async function fetchBitcoinWallet(address: string): Promise<LiveWalletDat
           ? new Date(t.status.block_time * 1000).toISOString()
           : new Date().toISOString(),
         type: isOut ? 'PEEL' : 'TRANSFER',
-        riskScore: isOut ? 84 : 70,
+        riskScore: txRisk.riskScore,
         explorerUrl: `https://blockstream.info/tx/${t.txid}`,
         direction: isOut ? 'OUTGOING' : 'INCOMING',
       });
@@ -657,31 +687,55 @@ function generateFallbackWallet(address: string, chain: BlockchainType): LiveWal
   const token = chain === 'TRON' ? 'USDT' : chain === 'ETH' ? 'ETH' : 'BTC';
   const balance = chain === 'TRON' ? 24500 : chain === 'ETH' ? 4.82 : 0.385;
 
+  const tx1Hash = generateRealisticDeterministicTxHash(address, 1, chain);
+  const tx1From = generateRealisticDeterministicAddress(address, 9, chain);
+  const tx1Risk = calculateTransactionRiskScore({
+    amount: balance,
+    token,
+    type: 'TRANSFER',
+    direction: 'INCOMING',
+    fromAddress: tx1From,
+    toAddress: address,
+    hash: tx1Hash,
+  });
+
+  const tx2Hash = generateRealisticDeterministicTxHash(address, 2, chain);
+  const tx2To = generateRealisticDeterministicAddress(address, 2, chain);
+  const tx2Risk = calculateTransactionRiskScore({
+    amount: balance * 0.91,
+    token,
+    type: 'PEEL',
+    direction: 'OUTGOING',
+    fromAddress: address,
+    toAddress: tx2To,
+    hash: tx2Hash,
+  });
+
   const txs: LiveTransaction[] = [
     {
-      hash: generateRealisticDeterministicTxHash(address, 1, chain),
-      from: generateRealisticDeterministicAddress(address, 9, chain),
+      hash: tx1Hash,
+      from: tx1From,
       to: address,
       amount: balance,
       token,
       usdValue: balance * (TOKEN_PRICES[token] || 1),
       timestamp: new Date(now.getTime() - 42 * 60 * 1000).toISOString(),
       type: 'TRANSFER',
-      riskScore: 92,
-      explorerUrl: getExplorerUrl('tx', generateRealisticDeterministicTxHash(address, 1, chain), chain),
+      riskScore: tx1Risk.riskScore,
+      explorerUrl: getExplorerUrl('tx', tx1Hash, chain),
       direction: 'INCOMING',
     },
     {
-      hash: generateRealisticDeterministicTxHash(address, 2, chain),
+      hash: tx2Hash,
       from: address,
-      to: generateRealisticDeterministicAddress(address, 2, chain),
+      to: tx2To,
       amount: balance * 0.91,
       token,
       usdValue: balance * 0.91 * (TOKEN_PRICES[token] || 1),
       timestamp: new Date(now.getTime() - 15 * 60 * 1000).toISOString(),
       type: 'PEEL',
-      riskScore: 88,
-      explorerUrl: getExplorerUrl('tx', generateRealisticDeterministicTxHash(address, 2, chain), chain),
+      riskScore: tx2Risk.riskScore,
+      explorerUrl: getExplorerUrl('tx', tx2Hash, chain),
       direction: 'OUTGOING',
     },
   ];
