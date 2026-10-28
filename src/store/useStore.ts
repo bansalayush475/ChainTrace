@@ -81,7 +81,7 @@ export interface NewInvestigationInput {
 const INITIAL_REPORTS: GeneratedReport[] = [
   {
     id: "REP-2024-0982",
-    title: "Section 79A IT Act & Section 63 BSA Certified Electronic Evidence Dossier",
+    title: "FIR-2024-DL-982314 Judicial Evidence Dossier",
     investigation: "Digital Arrest & CBI Cyber Extortion Syndicate (Southeast Asia)",
     investigationId: "INV-2024-0982",
     generatedAt: "2024-09-19T07:15:00.000Z",
@@ -103,7 +103,7 @@ const INITIAL_REPORTS: GeneratedReport[] = [
   },
   {
     id: "REP-2024-0401",
-    title: "Tornado Cash Privacy Mixer De-Anonymization & Temporal Mathematical Proof",
+    title: "FIR-2024-MH-401928 Judicial Evidence Dossier",
     investigation: "Pig Butchering Investment Scam & Tornado Cash Laundering",
     investigationId: "INV-2024-0401",
     generatedAt: "2024-09-18T20:30:00.000Z",
@@ -210,7 +210,7 @@ interface StoreState {
     }>;
     counterparties: number;
     riskScore: number;
-  }) => void;
+  }, investigationId?: string) => void;
 
   // Database actions
   isDbReady: boolean;
@@ -480,6 +480,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
       const updatedInv = { ...target, ...updates, updatedAt: now };
       dbSaveInvestigation(updatedInv).catch(console.warn);
+      api.updateInvestigation(id, updates).catch((err) => console.warn('Backend inv update sync:', err));
 
       const auditEntry: AuditLog = {
         id: `LOG-${Date.now()}`,
@@ -508,6 +509,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
       const updatedInv = { ...target, status, updatedAt: now };
       dbSaveInvestigation(updatedInv).catch(console.warn);
+      api.updateInvestigation(id, { status }).catch((err) => console.warn('Backend status update sync:', err));
 
       const auditEntry: AuditLog = {
         id: `LOG-${Date.now()}`,
@@ -648,6 +650,10 @@ export const useStore = create<StoreState>((set, get) => ({
       integrity: item.integrity || "VERIFIED",
     };
 
+    dbSaveEvidence(newEvidence).catch(console.warn);
+    api.addEvidence(newEvidence).catch((err) => console.warn('Backend evidence sync:', err));
+    dbGetStats().then((stats) => set({ dbStats: stats })).catch(() => {});
+
     set((state) => {
       const auditEntry: AuditLog = {
         id: `LOG-${Date.now()}`,
@@ -659,6 +665,7 @@ export const useStore = create<StoreState>((set, get) => ({
         session: `SES-${Date.now()}`,
         details: `Registered forensic evidence ${newEvidence.id} (${newEvidence.type})`,
       };
+      dbSaveAuditLog(auditEntry).catch(console.warn);
       return {
         evidence: [newEvidence, ...state.evidence],
         auditLogs: [auditEntry, ...state.auditLogs],
@@ -738,6 +745,14 @@ export const useStore = create<StoreState>((set, get) => ({
       walletAddress: tx.fromAddress,
     };
 
+    dbSaveTransaction(newTx).catch(console.warn);
+    dbSaveTimelineEvent(timelineEntry).catch(console.warn);
+    api.addTransaction(newTx).catch((err) => console.warn('Backend tx sync:', err));
+    if ((tx as any).investigationId) {
+      api.addTimelineEvent((tx as any).investigationId, timelineEntry).catch(console.warn);
+    }
+    dbGetStats().then((stats) => set({ dbStats: stats })).catch(() => {});
+
     set((s) => {
       const updatedWallets = s.wallets.map((w) => {
         if (w.address.toLowerCase() === tx.fromAddress.toLowerCase()) {
@@ -783,6 +798,10 @@ export const useStore = create<StoreState>((set, get) => ({
       ...event,
       id: event.id || `TLE-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
     };
+    dbSaveTimelineEvent(newEvent).catch(console.warn);
+    if (event.investigationId) {
+      api.addTimelineEvent(event.investigationId, newEvent).catch(console.warn);
+    }
     set((s) => ({
       timelineEvents: [newEvent, ...s.timelineEvents],
     }));
@@ -797,6 +816,8 @@ export const useStore = create<StoreState>((set, get) => ({
     if (existing) {
       if (Object.keys(customProps).length > 0) {
         const merged = { ...existing, ...customProps };
+        dbSaveWallet(merged).catch(console.warn);
+        api.addWallet(merged).catch(console.warn);
         set((s) => ({
           wallets: s.wallets.map((w) => (w.address.toLowerCase() === address.toLowerCase() ? merged : w)),
         }));
@@ -823,6 +844,9 @@ export const useStore = create<StoreState>((set, get) => ({
       ...customProps,
     };
 
+    dbSaveWallet(newWallet).catch(console.warn);
+    api.addWallet(newWallet).catch(console.warn);
+
     set((s) => ({
       wallets: [newWallet, ...s.wallets],
     }));
@@ -830,7 +854,7 @@ export const useStore = create<StoreState>((set, get) => ({
     return newWallet;
   },
 
-  syncLiveWalletTransactions: (walletData) => {
+  syncLiveWalletTransactions: (walletData, investigationId?: string) => {
     const state = get();
     const existingWallet = state.wallets.find(
       (w) => w.address.toLowerCase() === walletData.address.toLowerCase()
@@ -859,7 +883,7 @@ export const useStore = create<StoreState>((set, get) => ({
         usdValue: t.usdValue,
         token: t.token,
         type: t.type,
-        direction: t.direction,
+        direction: (t as any).direction,
         fromAddress: t.from,
         toAddress: t.to,
         hash: t.hash,
@@ -882,6 +906,7 @@ export const useStore = create<StoreState>((set, get) => ({
         type: (t.type === "DEPOSIT" ? "EXCHANGE_DEPOSIT" : t.type === "PEEL" ? "TRANSFER" : "TRANSFER") as any,
         riskScore: score,
         flags,
+        investigationId: investigationId || (t as any).investigationId || "",
       };
     });
 
@@ -918,11 +943,38 @@ export const useStore = create<StoreState>((set, get) => ({
       }
     });
 
-    // Persist updated wallet and transactions to IndexedDB
+    // Persist updated wallet and transactions to IndexedDB and Backend Database
     dbSaveWallet(updatedWallet).catch(console.warn);
-    filteredNewTxs.forEach((tx) => dbSaveTransaction(tx).catch(console.warn));
+    api.addWallet(updatedWallet).catch(console.warn);
+    filteredNewTxs.forEach((tx) => {
+      dbSaveTransaction(tx).catch(console.warn);
+      api.addTransaction(tx).catch(console.warn);
+    });
+    newCounterparties.forEach((cp) => {
+      dbSaveWallet(cp).catch(console.warn);
+      api.addWallet(cp).catch(console.warn);
+    });
+
+    let updatedInvs = state.investigations;
+    if (investigationId) {
+      updatedInvs = state.investigations.map((inv) => {
+        if (inv.id === investigationId) {
+          const updated = {
+            ...inv,
+            fundsTraced: Math.max(inv.fundsTraced, walletData.totalReceived > 0 ? walletData.totalReceived : inv.fundsTraced),
+            riskScore: walletData.riskScore || inv.riskScore,
+            updatedAt: new Date().toISOString(),
+          };
+          dbSaveInvestigation(updated).catch(console.warn);
+          api.updateInvestigation(investigationId, updated).catch(console.warn);
+          return updated;
+        }
+        return inv;
+      });
+    }
 
     set((s) => ({
+      investigations: updatedInvs,
       wallets: [
         updatedWallet,
         ...s.wallets.filter((w) => w.address.toLowerCase() !== walletData.address.toLowerCase()),

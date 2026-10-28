@@ -20,6 +20,10 @@ import {
   X,
   Send,
   Download,
+  RefreshCw,
+  FileCheck,
+  Copy,
+  Printer,
 } from 'lucide-react';
 import StatusBadge from '../components/ui/StatusBadge';
 import RiskScoreGauge from '../components/ui/RiskScoreGauge';

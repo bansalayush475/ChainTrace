@@ -15,6 +15,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { useStore, type GeneratedReport, type Transaction, type TimelineEvent } from '../store/useStore';
+import { investigations as defaultInvestigations } from '../data/mockData';
 import { truncateAddress } from '../utils/riskEngine';
 
 const containerVariants = {
@@ -71,21 +72,50 @@ function getCaseSha256(inv: any, reportId: string) {
 
 // Determines the destination VASP dynamically based on the specific case parameters
 function getAttributedVasp(inv: any) {
+  const caseId = inv?.caseId || 'CT-2024-001';
   const title = (inv?.title || '').toLowerCase();
   const chain = (inv?.blockchain || '').toUpperCase();
-  const caseId = inv?.caseId || 'CT-2024-001';
   const cleanNum = caseId.replace(/[^0-9]/g, '').slice(-6) || '774019';
 
-  if (title.includes('telegram') || title.includes('ponzi') || title.includes('mule') || title.includes('task')) {
+  // Digital arrest TRON case (FIR-2024-DL-982314)
+  if (caseId.includes('DL-982314') || title.includes('digital arrest') || title.includes('cbi') || (chain === 'TRON' && !title.includes('ponzi'))) {
     return {
-      name: 'CoinDCX / WazirX (Zanmai Labs Pvt Ltd)',
+      name: 'Binance International S.A. / Global Compliance Desk',
+      registration: 'FIU-IND Registration: RE000021482 / MAS Regulated Entity',
+      jurisdiction: 'Cayman Islands & FIU-IND Nodal Desk',
+      subAccountUid: 'BNB-UID-89104231',
+      kycTier: 'TIER-2 (Passport & Bank Verified Southeast Asia Node)',
+      subpoenaType: 'Section 94 BNSS Emergency VASP Subpoena',
+      complianceSla: '24 Hours (Urgent Injunction)',
+      freezeNotice: 'FREEZE-DL-982314-001',
+    };
+  }
+
+  // Pig butchering & Tornado Cash case (FIR-2024-MH-401928)
+  if (caseId.includes('MH-401928') || title.includes('pig') || title.includes('butchering') || title.includes('tornado')) {
+    return {
+      name: 'WazirX (Zanmai Labs Pvt Ltd)',
       registration: 'FIU-IND Registration: RE000019284',
-      jurisdiction: 'Mumbai, Maharashtra, India',
+      jurisdiction: 'Bandra Kurla Complex, Mumbai, Maharashtra',
+      subAccountUid: 'IND-UID-19284',
+      kycTier: 'TIER-2 (PAN & Aadhaar Verified Off-Ramp Gateway)',
+      subpoenaType: 'Section 94 BNSS / Section 91 CrPC Domestic Requisition',
+      complianceSla: '12 Hours (Domestic Immediate)',
+      freezeNotice: 'FREEZE-MH-401928-001',
+    };
+  }
+
+  // Telegram Task Ponzi case (FIR-2024-KA-718291)
+  if (caseId.includes('KA-718291') || title.includes('telegram') || title.includes('ponzi') || title.includes('task')) {
+    return {
+      name: 'CoinDCX (Neblio Technologies Pvt Ltd)',
+      registration: 'FIU-IND Registration: RE000018420',
+      jurisdiction: 'Bengaluru, Karnataka, India',
       subAccountUid: `IND-UID-${cleanNum}`,
-      kycTier: 'TIER-2 (PAN & Aadhaar Verified Mule)',
+      kycTier: 'TIER-2 (PAN & Aadhaar Verified Domestic Mule)',
       subpoenaType: 'Section 94 BNSS / Section 91 CrPC Domestic Requisition',
       complianceSla: '24 Hours (Domestic Critical)',
-      freezeNotice: `FREEZE-IND-${cleanNum}-01`,
+      freezeNotice: `FREEZE-KA-${cleanNum}-01`,
     };
   }
 
@@ -115,27 +145,14 @@ function getAttributedVasp(inv: any) {
     };
   }
 
-  if (title.includes('pig') || title.includes('butchering') || title.includes('invest')) {
-    return {
-      name: 'OKX Global (Aux Cayes FinTech Co. Ltd)',
-      registration: 'Bahamas DARE Reg: 2022-OKX-88',
-      jurisdiction: 'Nassau, Bahamas / Global Support Desk',
-      subAccountUid: `OKX-UID-${cleanNum}`,
-      kycTier: 'TIER-1 (Unverified Offshore Sub-Account)',
-      subpoenaType: 'Section 94 BNSS Emergency VASP Subpoena',
-      complianceSla: '48 Hours',
-      freezeNotice: `FREEZE-OKX-${cleanNum}-01`,
-    };
-  }
-
   return {
-    name: 'Binance International S.A.',
-    registration: 'BVI Registration: 1234567 / MAS Regulated Entity',
-    jurisdiction: 'Cayman Islands / Binance Global Compliance Desk',
-    subAccountUid: `BNB-UID-${cleanNum}`,
-    kycTier: 'TIER-1 (Partial KYC / High-Risk Shell)',
+    name: 'Binance International S.A. / CoinDCX Compliance',
+    registration: 'FIU-IND Registration: RE000019284 / Global Operations',
+    jurisdiction: 'FIU-IND Nodal Gateway / Global Support Desk',
+    subAccountUid: `CEX-UID-${cleanNum}`,
+    kycTier: 'TIER-2 (Exchange Verified Target Sub-Account)',
     subpoenaType: 'Section 94 BNSS / Section 91 CrPC VASP Notice',
-    complianceSla: '48 Hours',
+    complianceSla: '24–48 Hours',
     freezeNotice: `FREEZE-${caseId}-001`,
   };
 }
@@ -192,17 +209,48 @@ export default function ReportsPage() {
   // Resolve active investigation accurately for this specific report
   const activeInv = useMemo(() => {
     if (viewingPdfReport) {
-      return (
-        investigations.find(
-          (i) =>
-            i.id === viewingPdfReport.investigationId ||
-            i.caseId === viewingPdfReport.investigationId ||
-            i.title.toLowerCase() === viewingPdfReport.investigation?.toLowerCase() ||
-            (viewingPdfReport.title && viewingPdfReport.title.includes(i.caseId))
-        ) || investigations[0]
+      // 1. Direct match in active user investigations
+      const foundInStore = investigations.find(
+        (i) =>
+          i.id === viewingPdfReport.investigationId ||
+          i.caseId === viewingPdfReport.investigationId ||
+          i.title.toLowerCase() === viewingPdfReport.investigation?.toLowerCase() ||
+          (viewingPdfReport.title && viewingPdfReport.title.includes(i.caseId))
       );
+      if (foundInStore) return foundInStore;
+
+      // 2. Direct match in default investigations (e.g. if DB had wiped demo entries)
+      const foundInDefaults = defaultInvestigations.find(
+        (i) =>
+          i.id === viewingPdfReport.investigationId ||
+          i.caseId === viewingPdfReport.investigationId ||
+          i.title.toLowerCase() === viewingPdfReport.investigation?.toLowerCase() ||
+          (viewingPdfReport.title && viewingPdfReport.title.includes(i.caseId))
+      );
+      if (foundInDefaults) return foundInDefaults;
+
+      // 3. Match specific standard IDs
+      if (viewingPdfReport.id === 'REP-2024-0982' || viewingPdfReport.investigationId === 'INV-2024-0982') {
+        const d = defaultInvestigations.find(i => i.id === 'INV-2024-0982');
+        if (d) return d;
+      }
+      if (viewingPdfReport.id === 'REP-2024-0401' || viewingPdfReport.investigationId === 'INV-2024-0401') {
+        const d = defaultInvestigations.find(i => i.id === 'INV-2024-0401');
+        if (d) return d;
+      }
+
+      // 4. Try matching caseId in title (e.g. CT-2024-0914 or FIR-2024-DL-982314)
+      const caseMatch = viewingPdfReport.title.match(/(?:FIR|CT)-\d{4}-[A-Z0-9]+-\d+|CT-\d{4}-\d+/i);
+      if (caseMatch) {
+        const cId = caseMatch[0].toUpperCase();
+        const m = investigations.find(i => i.caseId === cId) || defaultInvestigations.find(i => i.caseId === cId);
+        if (m) return m;
+      }
+
+      // 5. Fallback to first available or synthesized representation
+      return investigations[0] || defaultInvestigations[0];
     }
-    return investigations.find((i) => i.id === selectedInv) || investigations[0];
+    return investigations.find((i) => i.id === selectedInv) || defaultInvestigations.find((i) => i.id === selectedInv) || investigations[0] || defaultInvestigations[0];
   }, [viewingPdfReport, selectedInv, investigations]);
 
   const caseSha256 = useMemo(() => {
@@ -234,40 +282,49 @@ export default function ReportsPage() {
       }));
     }
 
+    const cId = activeInv?.caseId || '';
     const totalAmt = activeInv?.fundsTraced || 1450000;
-    const isTron = (activeInv?.blockchain || '').toUpperCase() === 'TRON';
-    const isBtc = (activeInv?.blockchain || '').toUpperCase() === 'BTC';
     const sWallet = activeInv?.suspectWallet || '0xSuspect';
     const truncS = `${sWallet.slice(0, 8)}...${sWallet.slice(-4)}`;
 
-    if (isTron) {
+    // Case 1: Digital Arrest TRON Case (FIR-2024-DL-982314)
+    if (cId.includes('DL-982314') || activeInv?.blockchain === 'TRON') {
       return [
-        { hop: 1, tx: '0xa71b3e94...f2190a', from: 'VICTIM (1930 NCRP)', to: truncS, amt: totalAmt, type: 'INGRESS DEPOSIT (TRC-20)' },
-        { hop: 2, tx: '0xb82c4f10...c3201b', from: truncS, to: 'TYDzsY...7Q6z3', amt: Math.round(totalAmt * 0.98), type: 'MULE PEEL CASCADE' },
-        { hop: 3, tx: '0xc93d5a21...d4312c', from: 'TYDzsY...7Q6z3', to: 'TGeR9v...cVbNt', amt: Math.round(totalAmt * 0.95), type: 'LAYERED TRANSFER' },
-        { hop: 4, tx: '0xd04e6b32...e5423d', from: 'TGeR9v...cVbNt', to: 'TKwM1k...7z6rTx', amt: Math.round(totalAmt * 0.93), type: 'OTC STRUCTURING' },
-        { hop: 5, tx: '0xe15f7c43...f6534e', from: 'TKwM1k...7z6rTx', to: 'TQn9Y2...KaxUWF', amt: Math.round(totalAmt * 0.90), type: 'CEX SETTLEMENT' },
+        { hop: 1, tx: '0xa71b3e94...f2190a', from: 'VICTIM (1930 NCRP)', to: 'TYDzsY...7Q6z3', amt: 4850000, type: 'INGRESS DEPOSIT (TRC-20)' },
+        { hop: 2, tx: '0xb82c4f10...c3201b', from: 'TYDzsY...7Q6z3', to: 'TGeR9v...cVbNt', amt: 4720000, type: 'MULE PEEL CASCADE 1' },
+        { hop: 3, tx: '0xc93d5a21...d4312c', from: 'TGeR9v...cVbNt', to: 'TKwM1k...7z6rTx', amt: 4580000, type: 'OTC LAYERED DISPERSAL' },
+        { hop: 4, tx: '0xd04e6b32...e5423d', from: 'TKwM1k...7z6rTx', to: 'TQn9Y2...KaxUWF', amt: 4450000, type: 'BINANCE DEPOSIT (UID-89104231)' },
       ];
     }
 
-    if (isBtc) {
+    // Case 2: Pig Butchering & Tornado Cash Case (FIR-2024-MH-401928)
+    if (cId.includes('MH-401928') || activeInv?.title?.toLowerCase().includes('tornado') || activeInv?.title?.toLowerCase().includes('pig')) {
       return [
-        { hop: 1, tx: '6a8b9c...1029ab', from: 'VICTIM DOCKET', to: truncS, amt: totalAmt, type: 'UTXO INGRESS' },
-        { hop: 2, tx: '7b9c0d...2130bc', from: truncS, to: 'bc1q9x...7a29e4', amt: Math.round(totalAmt * 0.97), type: 'COINJOIN MIXER' },
-        { hop: 3, tx: '8c0d1e...3241cd', from: 'bc1q9x...7a29e4', to: '3J98t1...8b30f5', amt: Math.round(totalAmt * 0.94), type: 'PEELING OUTPUT' },
-        { hop: 4, tx: '9d1e2f...4352de', from: '3J98t1...8b30f5', to: 'bc1qw7...9c41a6', amt: Math.round(totalAmt * 0.91), type: 'CONSOLIDATION' },
-        { hop: 5, tx: '0e2f3a...5463ef', from: 'bc1qw7...9c41a6', to: '1A1zP1...P5QGefi', amt: Math.round(totalAmt * 0.88), type: 'OFF-RAMP SWEEP' },
+        { hop: 1, tx: '0x4f8a91b2...e4f3', from: 'VICTIM COMPLAINT', to: '0x71C839...102a', amt: 12500000, type: 'DIRECT INGRESS (ETH)' },
+        { hop: 2, tx: '0x1b2c3d4e...1b2c', from: '0x71C839...102a', to: '0xd90e2f...F31b', amt: 4881300, type: 'TORNADO CASH 100 ETH POOL' },
+        { hop: 3, tx: '0x7a8b9c0d...7a8b', from: '0xd90e2f...F31b', to: '0x498b31...4b29', amt: 4873300, type: 'FIXEDFLOAT BRIDGE RELAY' },
+        { hop: 4, tx: '0x9e2b1f8d...1c0b', from: '0x498b31...4b29', to: '0x294810...02a1', amt: 4789000, type: 'WAZIRX EXIT NODE (AMIT V.)' },
       ];
     }
 
+    // Case 3: Telegram Task Ponzi (FIR-2024-KA-718291)
+    if (cId.includes('KA-718291') || activeInv?.blockchain === 'POLYGON') {
+      return [
+        { hop: 1, tx: '0x5a6b7c8d...5a6b', from: 'VICTIM TELEGRAM LURE', to: '0x95aD61...C4cE', amt: 3200000, type: 'POLYGON STRUCTURING INGRESS' },
+        { hop: 2, tx: '0x3a2f1e0d...6e5b', from: '0x95aD61...C4cE', to: '0x38b819...8102', amt: 1550000, type: 'MULE SPLIT HOP 1' },
+        { hop: 3, tx: '0x6c7d8e9f...6c7d', from: '0x95aD61...C4cE', to: '0x892a01...2948', amt: 1480000, type: 'MULE SPLIT HOP 2' },
+        { hop: 4, tx: '0x8b9c0d1e...8b9c', from: '0x38b819...8102', to: '0x619289...1029', amt: 1510000, type: 'COINDCX SETTLEMENT NODE' },
+      ];
+    }
+
+    // Dynamic case (e.g. CT-2024-0914 / knkn / user created case)
     return [
-      { hop: 1, tx: '0x7a89b4...d5e381', from: 'VICTIM COMPLAINT', to: truncS, amt: totalAmt, type: 'DIRECT TRANSFER' },
-      { hop: 2, tx: '0x3e12d9...8a7019', from: truncS, to: '0xMixer...48102', amt: Math.round(totalAmt * 0.98), type: 'MIXER / BRIDGE INGRESS' },
-      { hop: 3, tx: '0x9c45b1...7d234a', from: '0xMixer...48102', to: '0xLayer...94814', amt: Math.round(totalAmt * 0.95), type: 'INTERMEDIARY HOP' },
-      { hop: 4, tx: '0xf812a3...9e056b', from: '0xLayer...94814', to: '0xRelay...02948', amt: Math.round(totalAmt * 0.93), type: 'HAWALA DISPERSAL' },
-      { hop: 5, tx: '0x2d78e4...1f993c', from: '0xRelay...02948', to: '0xCexDep...10294', amt: Math.round(totalAmt * 0.90), type: 'EXCHANGE SWEEP' },
+      { hop: 1, tx: `0x${(activeInv?.id || 'tx1').slice(-6)}a1b2...e4f1`, from: 'VICTIM COMPLAINT', to: truncS, amt: totalAmt, type: `${activeInv?.blockchain || 'ON-CHAIN'} INGRESS` },
+      { hop: 2, tx: `0x${(activeInv?.id || 'tx2').slice(-6)}c3d4...a2b3`, from: truncS, to: `0x${(sWallet || 'addr').slice(2, 8)}...8a19`, amt: Math.round(totalAmt * 0.98), type: 'PRIMARY PEELING HOP' },
+      { hop: 3, tx: `0x${(activeInv?.id || 'tx3').slice(-6)}e5f6...c4d5`, from: `0x${(sWallet || 'addr').slice(2, 8)}...8a19`, to: `0x${(sWallet || 'addr').slice(4, 10)}...9e21`, amt: Math.round(totalAmt * 0.94), type: 'INTERMEDIARY MULE HOP' },
+      { hop: 4, tx: `0x${(activeInv?.id || 'tx4').slice(-6)}7890...f6a7`, from: `0x${(sWallet || 'addr').slice(4, 10)}...9e21`, to: `${caseVasp.name.split(' ')[0]}...Vault`, amt: Math.round(totalAmt * 0.91), type: `${caseVasp.name.split(' ')[0]} CEX SETTLEMENT` },
     ];
-  }, [transactions, activeInv]);
+  }, [transactions, activeInv, caseVasp]);
 
   // Retrieve actual case timeline events
   const caseTimeline = useMemo(() => {
@@ -280,13 +337,38 @@ export default function ReportsPage() {
       }));
     }
 
+    const cId = activeInv?.caseId || '';
+    if (cId.includes('DL-982314') || activeInv?.blockchain === 'TRON') {
+      return [
+        { ts: 'T+0:00', event: 'Complaint registered on 1930 Helpline (2024/NCRP/DL/982314)', actor: 'Complainant / Citizen Helpline 1930' },
+        { ts: 'T+0:15', event: 'Golden Hour Alert triggered; Cyber PS Special Cell initiated wallet trace', actor: 'Supervisory Command' },
+        { ts: 'T+0:30', event: 'Suspect TRON wallet TYDzsY...7Q6z3 identified on TronGrid RPC', actor: activeInv?.investigator || 'Special Cell Cyber Operations' },
+        { ts: 'T+1:10', event: 'Multi-hop peel chain traversal correlated 4 mule addresses in Southeast Asia syndicate', actor: 'ChainTrace Forensic Engine' },
+        { ts: 'T+1:45', event: 'Final deposit intercepted at Binance Deposit Vault TQn9Y2...KaxUWF (UID-89104231)', actor: 'ChainTrace Heuristic Core' },
+        { ts: 'T+2:15', event: 'Emergency Section 94 BNSS debit freeze requisition served to Binance Global Desk', actor: activeInv?.investigator || 'Special Cell Cyber Operations' },
+        { ts: 'T+3:00', event: 'Tamper-evident electronic evidence sealed under Section 63 BSA', actor: user?.name || 'Lead Examiner' },
+      ];
+    }
+
+    if (cId.includes('MH-401928') || activeInv?.title?.toLowerCase().includes('tornado') || activeInv?.title?.toLowerCase().includes('pig')) {
+      return [
+        { ts: 'T+0:00', event: 'Victim complaint registered at Maharashtra Cyber CID', actor: 'Complainant / Cyber PS' },
+        { ts: 'T+0:45', event: 'Ingress wallet 0x71C839...102a flagged for Tornado Cash privacy pool routing', actor: activeInv?.investigator || 'Maharashtra Cyber CID' },
+        { ts: 'T+1:30', event: 'Temporal-volume heuristic matching unmasked 18.42 ETH mixer egress', actor: 'ChainTrace XAI Engine' },
+        { ts: 'T+2:10', event: 'FixedFloat instant bridge relayer identified linking to domestic off-ramp', actor: 'ChainTrace Cross-Chain Core' },
+        { ts: 'T+3:00', event: 'Beneficiary unmasked at WazirX deposit gateway (Amit V. KYC verified)', actor: 'ChainTrace Forensic Core' },
+        { ts: 'T+3:45', event: 'Section 94 BNSS statutory requisition FREEZE-MH-401928-001 served on Zanmai Labs Pvt Ltd', actor: activeInv?.investigator || 'Lead Examiner' },
+        { ts: 'T+4:30', event: 'Electronic evidence docket certified under Section 79A IT Act', actor: user?.name || 'Lead Examiner' },
+      ];
+    }
+
     return [
-      { ts: 'T+0:00', event: `Complaint Registered on NCRP (${activeInv?.caseId || '1930 Helpline'})`, actor: 'Complainant / Citizen Helpline 1930' },
-      { ts: 'T+0:30', event: `Investigation Docket Assigned to ${activeInv?.investigator || 'Cyber Cell'}`, actor: 'Supervisory Command' },
-      { ts: 'T+1:15', event: `Suspect Wallet ${truncateAddress(activeInv?.suspectWallet || '', 6)} Flagged on ${activeInv?.blockchain || 'Multi-Chain'}`, actor: activeInv?.investigator || 'Investigator' },
-      { ts: 'T+2:40', event: `Attribution to ${caseVasp.name} completed with high confidence`, actor: 'ChainTrace Forensic Engine' },
-      { ts: 'T+3:30', event: `Statutory Notice ${caseVasp.freezeNotice} drafted for compliance desk`, actor: activeInv?.investigator || 'Investigator' },
-      { ts: 'T+4:15', event: 'Evidence sealed with SHA-256 digest under Section 63 BSA', actor: user?.name || 'Lead Examiner' },
+      { ts: 'T+0:00', event: `Investigation Docket ${activeInv?.caseId || 'CT-2024'} registered: ${activeInv?.title}`, actor: 'Supervisory Command' },
+      { ts: 'T+0:20', event: `Target suspect wallet ${truncateAddress(activeInv?.suspectWallet || '', 6)} flagged on ${activeInv?.blockchain || 'Multi-Chain'}`, actor: activeInv?.investigator || 'Investigator' },
+      { ts: 'T+1:15', event: `Multi-hop traversal completed; ₹${Number(activeInv?.fundsTraced || 0).toLocaleString('en-IN')} traced across ledger hops`, actor: 'ChainTrace Forensic Engine' },
+      { ts: 'T+2:00', event: `Attribution to ${caseVasp.name} completed with high confidence`, actor: 'ChainTrace Attribution Core' },
+      { ts: 'T+2:45', event: `Statutory Notice ${caseVasp.freezeNotice} drafted for compliance desk`, actor: activeInv?.investigator || 'Investigator' },
+      { ts: 'T+3:30', event: 'Evidence sealed with SHA-256 digest under Section 63 BSA', actor: user?.name || 'Lead Examiner' },
     ];
   }, [timelineEvents, activeInv, caseVasp, user]);
 
@@ -538,9 +620,30 @@ immutable consensus ledger states without tampering or alteration.
           </div>
         ) : (
           availableReports.map((report) => {
-            const linkedCase = investigations.find(
-              (i) => i.id === report.investigationId || i.caseId === report.investigationId || i.title === report.investigation
-            );
+            const linkedCase =
+              investigations.find(
+                (i) =>
+                  i.id === report.investigationId ||
+                  i.caseId === report.investigationId ||
+                  i.title.toLowerCase() === report.investigation?.toLowerCase()
+              ) ||
+              defaultInvestigations.find(
+                (i) =>
+                  i.id === report.investigationId ||
+                  i.caseId === report.investigationId ||
+                  i.title.toLowerCase() === report.investigation?.toLowerCase()
+              );
+
+            const resolvedCaseId =
+              linkedCase?.caseId ||
+              (report.id === 'REP-2024-0982' ? 'FIR-2024-DL-982314' : '') ||
+              (report.id === 'REP-2024-0401' ? 'FIR-2024-MH-401928' : '') ||
+              report.investigationId?.match(/(?:FIR|CT)-\d{4}-[A-Z0-9]+-\d+|CT-\d{4}-\d+/i)?.[0]?.toUpperCase() ||
+              report.title?.match(/(?:FIR|CT)-\d{4}-[A-Z0-9]+-\d+|CT-\d{4}-\d+/i)?.[0]?.toUpperCase() ||
+              'CT-2024';
+
+            // All reports share the exact same clean judicial title format
+            const displayTitle = `${resolvedCaseId} Judicial Evidence Dossier`;
 
             return (
               <motion.div
@@ -553,10 +656,10 @@ immutable consensus ledger states without tampering or alteration.
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   gap: '16px',
-                  flexWrap: 'wrap',
+                  flexWrap: 'nowrap',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0, flex: 1, marginRight: '12px' }}>
                   <div
                     style={{
                       width: '44px',
@@ -572,9 +675,20 @@ immutable consensus ledger states without tampering or alteration.
                   >
                     <FileText size={20} style={{ color: 'var(--accent)' }} />
                   </div>
-                  <div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 700, fontSize: '14.5px', color: 'var(--text-primary)' }}>{report.title}</span>
+                      <span
+                        style={{
+                          fontWeight: 700,
+                          fontSize: '14.5px',
+                          color: 'var(--text-primary)',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {displayTitle}
+                      </span>
                       <span
                         style={{
                           fontSize: '10px',
@@ -584,33 +698,42 @@ immutable consensus ledger states without tampering or alteration.
                           background: 'var(--bg-elevated)',
                           color: 'var(--text-secondary)',
                           border: '1px solid var(--border)',
+                          flexShrink: 0,
                         }}
                       >
                         {report.id}
                       </span>
-                      {linkedCase && (
-                        <span
-                          style={{
-                            fontSize: '10px',
-                            fontFamily: 'JetBrains Mono, monospace',
-                            padding: '1px 6px',
-                            borderRadius: '4px',
-                            background: 'rgba(14,165,233,0.1)',
-                            color: '#0284c7',
-                            border: '1px solid rgba(14,165,233,0.3)',
-                          }}
-                        >
-                          CASE: {linkedCase.caseId}
-                        </span>
-                      )}
+                      <span
+                        style={{
+                          fontSize: '10px',
+                          fontFamily: 'JetBrains Mono, monospace',
+                          padding: '1px 6px',
+                          borderRadius: '4px',
+                          background: 'rgba(14,165,233,0.1)',
+                          color: '#0284c7',
+                          border: '1px solid rgba(14,165,233,0.3)',
+                          flexShrink: 0,
+                        }}
+                      >
+                        CASE: {resolvedCaseId}
+                      </span>
                     </div>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '3px' }}>
+                    <div
+                      style={{
+                        color: 'var(--text-secondary)',
+                        fontSize: '12px',
+                        marginTop: '3px',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
                       <strong>{report.investigation}</strong> · {report.pages} pages · Certified: {new Date(report.generatedAt).toLocaleString()}
                     </div>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                   <span
                     style={{
                       background: report.status === 'FINAL' ? 'rgba(56,161,105,0.1)' : 'rgba(214,158,46,0.1)',
@@ -621,6 +744,7 @@ immutable consensus ledger states without tampering or alteration.
                       fontSize: '11px',
                       fontWeight: 700,
                       letterSpacing: '0.04em',
+                      whiteSpace: 'nowrap',
                     }}
                   >
                     {report.status === 'FINAL' ? 'OFFICIALLY CERTIFIED' : 'DRAFT EXHIBIT'}
@@ -640,6 +764,7 @@ immutable consensus ledger states without tampering or alteration.
                       fontSize: '12.5px',
                       fontWeight: 700,
                       cursor: 'pointer',
+                      whiteSpace: 'nowrap',
                     }}
                   >
                     <Printer size={13} /> VIEW & PRINT PDF
@@ -658,6 +783,7 @@ immutable consensus ledger states without tampering or alteration.
                       color: 'var(--text-primary)',
                       fontSize: '12px',
                       cursor: 'pointer',
+                      whiteSpace: 'nowrap',
                     }}
                     title="Download Statutory Requisition Text"
                   >
@@ -677,6 +803,7 @@ immutable consensus ledger states without tampering or alteration.
                       color: 'var(--text-primary)',
                       fontSize: '12px',
                       cursor: 'pointer',
+                      whiteSpace: 'nowrap',
                     }}
                     title="Download Cryptographic Hash Manifest"
                   >

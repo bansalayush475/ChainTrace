@@ -16,7 +16,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import { detectBlockchain } from '../../services/blockchainService';
+import { detectBlockchain, fetchLiveWallet } from '../../services/blockchainService';
 
 interface NewInvestigationModalProps {
   onClose: () => void;
@@ -36,7 +36,7 @@ export default function NewInvestigationModal({
   onCreated,
 }: NewInvestigationModalProps) {
   const navigate = useNavigate();
-  const { addInvestigation, user } = useStore();
+  const { addInvestigation, syncLiveWalletTransactions, user } = useStore();
 
   const [form, setForm] = useState({
     title: initialTitle,
@@ -90,6 +90,14 @@ export default function NewInvestigationModal({
       description: form.description,
       tags: tagArray.length > 0 ? tagArray : undefined,
     });
+
+    if (form.suspectWallet && form.suspectWallet.trim()) {
+      fetchLiveWallet(form.suspectWallet.trim())
+        .then((walletData) => {
+          syncLiveWalletTransactions(walletData, newInv.id);
+        })
+        .catch((err) => console.warn('[NewCase] Live wallet query:', err));
+    }
 
     setSuccess(true);
     if (onCreated) {
