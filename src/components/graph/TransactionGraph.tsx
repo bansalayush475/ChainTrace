@@ -554,6 +554,15 @@ export default function TransactionGraph({ investigationId, walletAddress, compa
 
       {/* Main ReactFlow Graph */}
       <div style={{ flex: 1, position: 'relative', width: '100%', height: '100%' }}>
+        {nodes.length === 0 && (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 5, pointerEvents: 'none' }}>
+            <Shield size={36} style={{ color: 'var(--accent)', opacity: 0.35, marginBottom: '8px' }} />
+            <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>No On-Chain Nodes In Scope</span>
+            <span style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+              Create an investigation or enter a target wallet to generate DAG fund flow topography
+            </span>
+          </div>
+        )}
         <ReactFlow
           nodes={nodes}
           edges={edges}

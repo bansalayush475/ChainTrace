@@ -62,12 +62,7 @@ function getFlagTitle(flag: string): string {
 
 export default function TransactionsPage() {
   const navigate = useNavigate();
-  const { transactions: storeTxs } = useStore();
-  
-  // Merge live store transactions with rich mock data so the demo never looks empty,
-  // but still shows new transactions added via the app.
-  const allTxs = [...storeTxs, ...mockTransactions];
-  const transactions = Array.from(new Map(allTxs.map(t => [t.hash, t])).values());
+  const { transactions } = useStore();
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [riskFilter, setRiskFilter] = useState('ALL');
   const [searchText, setSearchText] = useState('');

@@ -279,17 +279,17 @@ export const useStore = create<StoreState>((set, get) => ({
   supabaseStatus: null,
   isBackendConnected: false,
 
-  // Populate collections with dynamic presentation data
-  investigations: initialInvestigations,
-  alerts: initialAlerts,
-  wallets: initialWallets,
-  transactions: initialTransactions,
-  timelineEvents: initialTimelineEvents,
-  evidence: initialEvidence,
-  reports: INITIAL_REPORTS,
-  auditLogs: initialAuditLogs,
-  watchlistItems: initialWatchlistItems,
-  watchlist: initialWatchlistItems.map((w) => w.target),
+  // Initial store state begins clean (0 records)
+  investigations: [],
+  alerts: [],
+  wallets: [],
+  transactions: [],
+  timelineEvents: [],
+  evidence: [],
+  reports: [],
+  auditLogs: [],
+  watchlistItems: [],
+  watchlist: [],
   investigationNotes: {},
 
   login: (userOrRole: User | "SENIOR" | "JUNIOR" | boolean | string = "SENIOR", customEmail?: string) => {

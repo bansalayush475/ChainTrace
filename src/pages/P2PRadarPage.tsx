@@ -160,9 +160,9 @@ const mockP2POrders: P2POrder[] = [DEMO_ESCROW_ORDER, DEMO_ESCROW_ORDER_2, DEMO_
 
 export default function P2PRadarPage() {
   const { user } = useStore();
-  const [orders, setOrders] = useState<P2POrder[]>(mockP2POrders);
+  const [orders, setOrders] = useState<P2POrder[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedOrder, setSelectedOrder] = useState<P2POrder | null>(mockP2POrders[0] || null);
+  const [selectedOrder, setSelectedOrder] = useState<P2POrder | null>(null);
   const [freezeSimulated, setFreezeSimulated] = useState<boolean>(false);
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'DETAILS' | 'MULE_CASCADE' | 'FREEZE_NOTICE' | 'TELEGRAM_OTC'>('DETAILS');

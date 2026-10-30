@@ -534,6 +534,9 @@ export const db = {
   // INVESTIGATIONS
   // ==========================================
   async getInvestigations(filter = {}) {
+    if (memoryDb.meta && memoryDb.meta.clearedAt && (!memoryDb.investigations || memoryDb.investigations.length === 0)) {
+      return [];
+    }
     const supabase = getSupabase();
     if (supabase) {
       try {
@@ -1195,7 +1198,7 @@ export const db = {
         supabase.from('timeline_events').select('*').order('created_at', { ascending: true }),
       ]);
 
-      if (Array.isArray(invRes.data)) {
+      if (Array.isArray(invRes.data) && !(memoryDb.meta && memoryDb.meta.clearedAt && memoryDb.investigations.length === 0)) {
         memoryDb.investigations = invRes.data.map(fromSupabaseInvestigation);
       }
       if (Array.isArray(walRes.data)) {

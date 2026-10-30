@@ -90,7 +90,6 @@ export default function DashboardPage() {
 
   const [liveAlerts, setLiveAlerts] = useState(alerts.slice(0, 5));
   const [showModal, setShowModal] = useState(false);
-  const [alertIdx, setAlertIdx] = useState(0);
 
   // Table filter state
   const [tableFilter, setTableFilter] = useState<'ALL' | 'HIGH_RISK' | 'ACTIVE'>('ALL');
@@ -107,26 +106,8 @@ export default function DashboardPage() {
   const teamTotalFunds = investigations.reduce((sum, inv) => sum + (inv.fundsTraced || 0), 0);
 
   useEffect(() => {
-    if (wallets.length === 0 && investigations.length === 0 && alerts.length === 0) {
-      setLiveAlerts([]);
-      return;
-    }
-    const interval = setInterval(() => {
-      const template = LIVE_ALERT_MESSAGES[alertIdx % LIVE_ALERT_MESSAGES.length];
-      const newAlert = {
-        id: `live-${Date.now()}`,
-        severity: template.severity,
-        type: template.type,
-        walletAddress: wallets[Math.floor(Math.random() * wallets.length)]?.address || '0x0000000000000000000000000000000000000000',
-        message: template.message,
-        timestamp: new Date().toISOString(),
-        dismissed: false,
-      };
-      setLiveAlerts((prev) => [newAlert, ...prev].slice(0, 10));
-      setAlertIdx((i) => i + 1);
-    }, 3500);
-    return () => clearInterval(interval);
-  }, [alertIdx, wallets, investigations.length, alerts.length]);
+    setLiveAlerts(alerts.slice(0, 5));
+  }, [alerts]);
 
   function handleSeniorApprove(id: string, title: string, actionType: string) {
     setApprovedItems((prev) => ({ ...prev, [id]: true }));
@@ -737,83 +718,45 @@ export default function DashboardPage() {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {/* Sign-off Item 1 */}
-                <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', padding: '10px 12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)', fontFamily: 'JetBrains Mono, monospace' }}>CT-2024-0892</span>
-                    <StatusBadge status={approvedItems['REV-01'] ? 'ESCALATED' : 'ANALYZING'} size="sm" />
+                {visibleInvestigations.length === 0 ? (
+                  <div style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '12px' }}>
+                    <CheckCircle2 size={28} style={{ color: '#10b981', margin: '0 auto 8px', display: 'block', opacity: 0.8 }} />
+                    <span style={{ fontWeight: 600, display: 'block', color: 'var(--text-primary)', marginBottom: '4px' }}>Supervisory Queue Cleared</span>
+                    No pending case dossiers or exhibits awaiting level-4 supervisory review.
                   </div>
-                  <p style={{ margin: '0 0 8px', fontSize: '11.5px', color: 'var(--text-primary)', lineHeight: 1.4 }}>
-                    Romance Scam USDT — Submitted by Priya Patel (Junior Analyst) for task force ESCALATION.
-                  </p>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>884,000 USDT</span>
-                    {approvedItems['REV-01'] ? (
-                      <span style={{ color: '#38a169', fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '3px' }}>
-                        <CheckCircle2 size={13} /> Approved
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => handleSeniorApprove('REV-01', 'CT-2024-0892', 'Priority Escalation')}
-                        style={{ padding: '4px 10px', background: 'var(--accent)', border: 'none', borderRadius: '4px', color: '#fff', fontSize: '10.5px', fontWeight: 700, cursor: 'pointer' }}
-                      >
-                        Approve Escalation
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Sign-off Item 2 */}
-                <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', padding: '10px 12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)', fontFamily: 'JetBrains Mono, monospace' }}>EVD-4091</span>
-                    <StatusBadge status={approvedItems['REV-02'] ? 'VERIFIED' : 'PENDING'} size="sm" />
-                  </div>
-                  <p style={{ margin: '0 0 8px', fontSize: '11.5px', color: 'var(--text-primary)', lineHeight: 1.4 }}>
-                    Mixer Hop Analysis Raw Output — Awaiting cryptographic lead signature for court exhibit.
-                  </p>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>SHA-256 Digest Verified</span>
-                    {approvedItems['REV-02'] ? (
-                      <span style={{ color: '#38a169', fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '3px' }}>
-                        <CheckCircle2 size={13} /> Certified
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => handleSeniorApprove('REV-02', 'EVD-4091', 'Cryptographic Certification')}
-                        style={{ padding: '4px 10px', background: 'var(--accent)', border: 'none', borderRadius: '4px', color: '#fff', fontSize: '10.5px', fontWeight: 700, cursor: 'pointer' }}
-                      >
-                        Certify Exhibit §79A
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Sign-off Item 3 */}
-                <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', padding: '10px 12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#d69e2e', fontFamily: 'JetBrains Mono, monospace' }}>SUBPOENA-REQ</span>
-                    <StatusBadge status={approvedItems['REV-03'] ? 'VERIFIED' : 'PENDING'} size="sm" />
-                  </div>
-                  <p style={{ margin: '0 0 8px', fontSize: '11.5px', color: 'var(--text-primary)', lineHeight: 1.4 }}>
-                    Binance KYC Records Request: Target deposit address identified on Ronin Bridge hack.
-                  </p>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>VASP Legal Team</span>
-                    {approvedItems['REV-03'] ? (
-                      <span style={{ color: '#38a169', fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '3px' }}>
-                        <CheckCircle2 size={13} /> Subpoena Issued
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => handleSeniorApprove('REV-03', 'Subpoena-Binance', 'VASP Notice')}
-                        style={{ padding: '4px 10px', background: '#d69e2e', border: 'none', borderRadius: '4px', color: '#fff', fontSize: '10.5px', fontWeight: 700, cursor: 'pointer' }}
-                      >
-                        Authorize Subpoena
-                      </button>
-                    )}
-                  </div>
-                </div>
+                ) : (
+                  <>
+                    {/* Sign-off Item 1 */}
+                    <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', padding: '10px 12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)', fontFamily: 'JetBrains Mono, monospace' }}>
+                          {visibleInvestigations[0]?.caseId || 'CT-2024-0892'}
+                        </span>
+                        <StatusBadge status={approvedItems['REV-01'] ? 'ESCALATED' : (visibleInvestigations[0]?.status || 'ANALYZING')} size="sm" />
+                      </div>
+                      <p style={{ margin: '0 0 8px', fontSize: '11.5px', color: 'var(--text-primary)', lineHeight: 1.4 }}>
+                        {visibleInvestigations[0]?.title || 'Suspect Tracking Docket'} — Submitted for task force review.
+                      </p>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>
+                          ₹{formatUSD(visibleInvestigations[0]?.fundsTraced || 0)}
+                        </span>
+                        {approvedItems['REV-01'] ? (
+                          <span style={{ color: '#38a169', fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            <CheckCircle2 size={13} /> Approved
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleSeniorApprove('REV-01', visibleInvestigations[0]?.caseId || 'CASE', 'Priority Escalation')}
+                            style={{ padding: '4px 10px', background: 'var(--accent)', border: 'none', borderRadius: '4px', color: '#fff', fontSize: '10.5px', fontWeight: 700, cursor: 'pointer' }}
+                          >
+                            Approve Escalation
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           ) : (
@@ -901,40 +844,36 @@ export default function DashboardPage() {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>Assigned Field Tasks</span>
-                  <span style={{ fontSize: '10.5px', color: '#38a169', fontWeight: 700 }}>3 PENDING</span>
+                  <span style={{ fontSize: '10.5px', color: visibleInvestigations.length > 0 ? '#38a169' : 'var(--text-secondary)', fontWeight: 700 }}>
+                    {visibleInvestigations.length > 0 ? `${visibleInvestigations.length} ACTIVE` : '0 PENDING'}
+                  </span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', padding: '10px 12px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
-                      <span style={{ fontSize: '10.5px', color: 'var(--accent)', fontWeight: 700 }}>TASK #1 · HOP TRACE</span>
-                      <span style={{ fontSize: '10px', color: 'var(--risk-critical)', fontWeight: 700 }}>HIGH</span>
+                  {visibleInvestigations.length === 0 ? (
+                    <div style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '12px' }}>
+                      <CheckCircle2 size={24} style={{ color: '#10b981', margin: '0 auto 6px', display: 'block', opacity: 0.8 }} />
+                      <span style={{ fontWeight: 600, display: 'block', color: 'var(--text-primary)', marginBottom: '3px' }}>No Assigned Field Tasks</span>
+                      All case tasks complete. Intake new complaints or open investigations to assign tasks.
                     </div>
-                    <p style={{ margin: '0 0 6px', fontSize: '11.5px', color: 'var(--text-primary)' }}>
-                      Trace 3 hops downstream from <code>TQn9Y2...4Pr</code> on TRON.
-                    </p>
-                    <button
-                      onClick={() => navigate('/fund-flow')}
-                      style={{ padding: '4px 8px', background: 'var(--accent)', border: 'none', borderRadius: '4px', color: '#fff', fontSize: '10.5px', fontWeight: 600, cursor: 'pointer' }}
-                    >
-                      Open Tracer →
-                    </button>
-                  </div>
-
-                  <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', padding: '10px 12px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
-                      <span style={{ fontSize: '10.5px', color: 'var(--accent)', fontWeight: 700 }}>TASK #2 · CASE DOSSIER</span>
-                      <span style={{ fontSize: '10px', color: '#d69e2e', fontWeight: 700 }}>MED</span>
-                    </div>
-                    <p style={{ margin: '0 0 6px', fontSize: '11.5px', color: 'var(--text-primary)' }}>
-                      Log counterparty hashes for Case CT-2024-0892.
-                    </p>
-                    <button
-                      onClick={() => navigate('/investigations/INV-002')}
-                      style={{ padding: '4px 8px', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text-primary)', fontSize: '10.5px', fontWeight: 600, cursor: 'pointer' }}
-                    >
-                      Open Case →
-                    </button>
-                  </div>
+                  ) : (
+                    visibleInvestigations.slice(0, 2).map((inv, idx) => (
+                      <div key={inv.id} style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', padding: '10px 12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                          <span style={{ fontSize: '10.5px', color: 'var(--accent)', fontWeight: 700 }}>TASK #{idx + 1} · {inv.blockchain} TRACE</span>
+                          <span style={{ fontSize: '10px', color: inv.priority === 'CRITICAL' ? 'var(--risk-critical)' : '#d69e2e', fontWeight: 700 }}>{inv.priority}</span>
+                        </div>
+                        <p style={{ margin: '0 0 6px', fontSize: '11.5px', color: 'var(--text-primary)' }}>
+                          Trace hops downstream from <code>{truncateAddress(inv.suspectWallet, 6)}</code> on {inv.blockchain}.
+                        </p>
+                        <button
+                          onClick={() => navigate(`/investigations/${inv.id}`)}
+                          style={{ padding: '4px 8px', background: 'var(--accent)', border: 'none', borderRadius: '4px', color: '#fff', fontSize: '10.5px', fontWeight: 600, cursor: 'pointer' }}
+                        >
+                          Open Case →
+                        </button>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>

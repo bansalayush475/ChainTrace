@@ -123,7 +123,7 @@ export default function BulkTriagePage() {
   const { user } = useStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [complaints, setComplaints] = useState<TriageComplaint[]>(SAMPLE_NCRP_COMPLAINTS);
+  const [complaints, setComplaints] = useState<TriageComplaint[]>([]);
   const [filterUrgency, setFilterUrgency] = useState<string>('ALL');
   const [filterState, setFilterState] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
