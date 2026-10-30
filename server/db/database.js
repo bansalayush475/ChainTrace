@@ -1195,19 +1195,19 @@ export const db = {
         supabase.from('timeline_events').select('*').order('created_at', { ascending: true }),
       ]);
 
-      if (invRes.data && invRes.data.length > 0) {
+      if (Array.isArray(invRes.data)) {
         memoryDb.investigations = invRes.data.map(fromSupabaseInvestigation);
       }
-      if (walRes.data && walRes.data.length > 0) {
+      if (Array.isArray(walRes.data)) {
         memoryDb.wallets = walRes.data.map(fromSupabaseWallet);
       }
-      if (txRes.data && txRes.data.length > 0) {
+      if (Array.isArray(txRes.data)) {
         memoryDb.transactions = txRes.data.map(fromSupabaseTransaction);
       }
-      if (evRes.data && evRes.data.length > 0) {
+      if (Array.isArray(evRes.data)) {
         memoryDb.evidence = evRes.data.map(fromSupabaseEvidence);
       }
-      if (tleRes.data && tleRes.data.length > 0) {
+      if (Array.isArray(tleRes.data)) {
         memoryDb.timeline_events = tleRes.data.map(fromSupabaseTimeline);
       }
       writeLocalDb(memoryDb);

@@ -264,14 +264,8 @@ DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'users' AND policyname = 'Allow LEA access on users') THEN
         CREATE POLICY "Allow LEA access on users" ON users FOR ALL USING (true);
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'investigations' AND policyname = 'Allow LEA read access on investigations') THEN
-        CREATE POLICY "Allow LEA read access on investigations" ON investigations FOR SELECT USING (true);
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'investigations' AND policyname = 'Allow LEA insert on investigations') THEN
-        CREATE POLICY "Allow LEA insert on investigations" ON investigations FOR INSERT WITH CHECK (true);
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'investigations' AND policyname = 'Allow LEA update on investigations') THEN
-        CREATE POLICY "Allow LEA update on investigations" ON investigations FOR UPDATE USING (true);
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'investigations' AND policyname = 'Allow LEA access on investigations') THEN
+        CREATE POLICY "Allow LEA access on investigations" ON investigations FOR ALL USING (true);
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'timeline_events' AND policyname = 'Allow LEA access on timeline_events') THEN
         CREATE POLICY "Allow LEA access on timeline_events" ON timeline_events FOR ALL USING (true);

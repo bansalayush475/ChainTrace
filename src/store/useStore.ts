@@ -1053,35 +1053,27 @@ export const useStore = create<StoreState>((set, get) => ({
           api.getAuditLogs().catch(() => []),
         ]);
 
-        set((s) => ({
-          investigations: serverInvs && serverInvs.length > 0 ? serverInvs : s.investigations,
-          wallets: serverWallets && serverWallets.length > 0 ? serverWallets : s.wallets,
-          transactions: serverTxs && serverTxs.length > 0 ? serverTxs : s.transactions,
-          evidence: serverEvidence && serverEvidence.length > 0 ? serverEvidence : s.evidence,
-          auditLogs: serverAudit && serverAudit.length > 0 ? serverAudit : s.auditLogs,
-        }));
+        set({
+          investigations: Array.isArray(serverInvs) ? serverInvs : [],
+          wallets: Array.isArray(serverWallets) ? serverWallets : [],
+          transactions: Array.isArray(serverTxs) ? serverTxs : [],
+          evidence: Array.isArray(serverEvidence) ? serverEvidence : [],
+          auditLogs: Array.isArray(serverAudit) ? serverAudit : [],
+        });
       } catch {
         // Backend offline or local fallback
       }
 
-      const hydrated = await dbSeedInitialIfEmpty({
-        investigations: initialInvestigations,
-        evidence: initialEvidence,
-        wallets: initialWallets,
-        transactions: initialTransactions,
-        auditLogs: initialAuditLogs,
-        timelineEvents: initialTimelineEvents,
-      });
-
+      const hydrated = await dbSeedInitialIfEmpty();
       const stats = await dbGetStats();
 
       set((s) => ({
-        investigations: s.investigations.length > 0 ? s.investigations : hydrated.investigations,
-        evidence: s.evidence.length > 0 ? s.evidence : hydrated.evidence,
-        wallets: s.wallets.length > 0 ? s.wallets : hydrated.wallets,
-        transactions: s.transactions.length > 0 ? s.transactions : hydrated.transactions,
-        auditLogs: s.auditLogs.length > 0 ? s.auditLogs : hydrated.auditLogs,
-        timelineEvents: s.timelineEvents.length > 0 ? s.timelineEvents : hydrated.timelineEvents,
+        investigations: s.isBackendConnected ? s.investigations : (hydrated.investigations || []),
+        evidence: s.isBackendConnected ? s.evidence : (hydrated.evidence || []),
+        wallets: s.isBackendConnected ? s.wallets : (hydrated.wallets || []),
+        transactions: s.isBackendConnected ? s.transactions : (hydrated.transactions || []),
+        auditLogs: s.isBackendConnected ? s.auditLogs : (hydrated.auditLogs || []),
+        timelineEvents: s.isBackendConnected ? s.timelineEvents : (hydrated.timelineEvents || []),
         dbStats: stats,
         isDbReady: true,
       }));
