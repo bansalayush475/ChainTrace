@@ -230,12 +230,16 @@ export default function ReportsPage() {
       if (foundInDefaults) return foundInDefaults;
 
       // 3. Match specific standard IDs
-      if (viewingPdfReport.id === 'REP-2024-0982' || viewingPdfReport.investigationId === 'INV-2024-0982') {
-        const d = defaultInvestigations.find(i => i.id === 'INV-2024-0982');
+      if (viewingPdfReport.id === 'REP-2024-0982' || viewingPdfReport.investigationId === 'INV-001' || viewingPdfReport.investigationId === 'INV-2024-0982') {
+        const d = investigations.find(i => i.id === 'INV-001' || i.caseId === 'FIR-2024-DL-982314') || defaultInvestigations.find(i => i.id === 'INV-001' || i.caseId === 'FIR-2024-DL-982314');
         if (d) return d;
       }
-      if (viewingPdfReport.id === 'REP-2024-0401' || viewingPdfReport.investigationId === 'INV-2024-0401') {
-        const d = defaultInvestigations.find(i => i.id === 'INV-2024-0401');
+      if (viewingPdfReport.id === 'REP-2024-0401' || viewingPdfReport.investigationId === 'INV-002' || viewingPdfReport.investigationId === 'INV-2024-0401') {
+        const d = investigations.find(i => i.id === 'INV-002' || i.caseId === 'FIR-2024-MH-401928') || defaultInvestigations.find(i => i.id === 'INV-002' || i.caseId === 'FIR-2024-MH-401928');
+        if (d) return d;
+      }
+      if (viewingPdfReport.id === 'REP-2024-0718' || viewingPdfReport.investigationId === 'INV-003' || viewingPdfReport.investigationId === 'INV-2024-0718') {
+        const d = investigations.find(i => i.id === 'INV-003' || i.caseId === 'FIR-2024-KA-718291') || defaultInvestigations.find(i => i.id === 'INV-003' || i.caseId === 'FIR-2024-KA-718291');
         if (d) return d;
       }
 

@@ -204,9 +204,9 @@ export interface ApiStatus {
 
 export const investigations: Investigation[] = [
   {
-    id: "INV-2024-0982",
+    id: "INV-001",
     caseId: "FIR-2024-DL-982314",
-    title: "Digital Arrest & CBI Cyber Extortion Syndicate (Southeast Asia)",
+    title: "Digital Arrest & CBI Extortion Syndicate (Southeast Asia)",
     suspectWallet: "TYDzsYUE3bmaipmxsioCGvPGMW5eN7Q6z3",
     blockchain: "TRON",
     riskScore: 94,
@@ -217,11 +217,11 @@ export const investigations: Investigation[] = [
     priority: "CRITICAL",
     createdAt: "2024-09-12T10:15:00.000Z",
     updatedAt: new Date().toISOString(),
-    description: "Citizen complaint escalated from 1930 Helpline. Senior citizen coerced into liquidating ₹48.5L into TRC-20 USDT via P2P mule escrow. Traced to Binance deposit UID-89104231 and intercepted before off-ramping.",
-    tags: ["1930-escalation", "digital-arrest", "golden-hour", "mule-cascade", "binance-subpoena"]
+    description: "Citizen complaint escalated from 1930 Helpline. Senior citizen coerced into liquidating ₹48.5L into TRC-20 USDT via P2P mule escrow. Traced across 4 hops to Binance deposit UID-89104231 and intercepted before off-ramping.",
+    tags: ["digital-arrest", "1930-escalation", "golden-hour", "binance-subpoena", "mule-cascade"]
   },
   {
-    id: "INV-2024-0401",
+    id: "INV-002",
     caseId: "FIR-2024-MH-401928",
     title: "Pig Butchering Investment Scam & Tornado Cash Laundering",
     suspectWallet: "0x71C839019284102948102948102948102a",
@@ -238,7 +238,7 @@ export const investigations: Investigation[] = [
     tags: ["pig-butchering", "mixer-deanonymized", "section-94-bnss", "cross-chain"]
   },
   {
-    id: "INV-2024-0718",
+    id: "INV-003",
     caseId: "FIR-2024-KA-718291",
     title: "Work-From-Home Telegram Task Ponzi & High-Velocity Mule Ring",
     suspectWallet: "0x95aD61b0a150d79219dCF64E1E6Cc01f0B64C4cE",
@@ -255,21 +255,21 @@ export const investigations: Investigation[] = [
     tags: ["telegram-scam", "polygon-peeling", "task-fraud", "upi-mules"]
   },
   {
-    id: "INV-2024-0512",
-    caseId: "FIR-2024-GJ-512093",
-    title: "Cross-Chain Hawala Bridge Smurfing via FixedFloat & THORChain",
-    suspectWallet: "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
-    blockchain: "BTC",
-    riskScore: 78,
-    fundsTraced: 8500000,
-    currency: "INR",
-    investigator: "Gujarat Cyber Crime Cell (Ahmedabad)",
-    status: "NEW",
+    id: "INV-024",
+    caseId: "CT-2024-0914",
+    title: "Operation Sovereign Sentinel - High-Yield Investment Fraud",
+    suspectWallet: "0x71C839019284102948102948102948102a",
+    blockchain: "ETH",
+    riskScore: 88,
+    fundsTraced: 1450000,
+    currency: "ETH",
+    investigator: "ayush",
+    status: "UNDER_INVESTIGATION",
     priority: "HIGH",
-    createdAt: "2024-09-18T16:05:00.000Z",
+    createdAt: "2026-10-26T08:51:00.000Z",
     updatedAt: new Date().toISOString(),
-    description: "Illicit gaming syndicate routing cross-chain swaps between Bitcoin and Tron to obscure Hawala settlements. Monitored for off-ramp at domestic exchanges.",
-    tags: ["cross-chain-swap", "fixedfloat", "hawala-evasion"]
+    description: "Forensic investigation docket opened for suspect Ethereum wallet tracing. Target unhosted wallet flagged for automated peeling into domestic exchange exit nodes.",
+    tags: ["ncrp-intake", "cyber-fraud", "freeze-ready", "evm-peeling"]
   }
 ];
 
@@ -594,7 +594,7 @@ export const alerts: Alert[] = [
     message: "Golden Hour Alert: 54,500 USDT escrow release detected towards suspect wallet. Immediate §106 BNSS Freeze Notice required.",
     timestamp: new Date(Date.now() - 12 * 60000).toISOString(),
     dismissed: false,
-    investigationId: "INV-2024-0982"
+    investigationId: "INV-001"
   },
   {
     id: "ALT-1092",
@@ -604,7 +604,7 @@ export const alerts: Alert[] = [
     message: "Direct deposit to Tornado Cash mixer contract detected. Temporal-volume correlation active.",
     timestamp: new Date(Date.now() - 25 * 60000).toISOString(),
     dismissed: false,
-    investigationId: "INV-2024-0401"
+    investigationId: "INV-002"
   },
   {
     id: "ALT-1093",
@@ -614,17 +614,17 @@ export const alerts: Alert[] = [
     message: "Rapid dispersal of funds across 14 Polygon wallets in under 8 minutes.",
     timestamp: new Date(Date.now() - 55 * 60000).toISOString(),
     dismissed: false,
-    investigationId: "INV-2024-0718"
+    investigationId: "INV-003"
   },
   {
     id: "ALT-1094",
     severity: "HIGH",
     type: "DORMANT_WALLET_ACTIVATION",
-    walletAddress: "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
-    message: "Dormant Bitcoin Hawala node transferred 1.84 BTC through cross-chain bridge gateway.",
+    walletAddress: "0x71C839019284102948102948102948102a",
+    message: "High velocity peeling sequence detected on unhosted wallet.",
     timestamp: new Date(Date.now() - 110 * 60000).toISOString(),
     dismissed: false,
-    investigationId: "INV-2024-0512"
+    investigationId: "INV-024"
   }
 ];
 
@@ -637,7 +637,7 @@ export const evidence: Evidence[] = [
     timestamp: "2024-09-19T06:50:00Z",
     source: "Binance FIU-IND Compliance Gateway",
     integrity: "VERIFIED",
-    investigationId: "INV-2024-0982",
+    investigationId: "INV-001",
     size: "4.8 MB"
   },
   {
@@ -648,7 +648,7 @@ export const evidence: Evidence[] = [
     timestamp: "2024-09-19T06:45:00Z",
     source: "TronGrid Enterprise Forensic RPC Node",
     integrity: "VERIFIED",
-    investigationId: "INV-2024-0982",
+    investigationId: "INV-001",
     size: "1.2 MB"
   },
   {
@@ -659,7 +659,7 @@ export const evidence: Evidence[] = [
     timestamp: "2024-09-19T07:10:00Z",
     source: "ChainTrace Heuristic Clustering Engine",
     integrity: "VERIFIED",
-    investigationId: "INV-2024-0982",
+    investigationId: "INV-001",
     size: "6.4 MB"
   },
   {
@@ -670,7 +670,7 @@ export const evidence: Evidence[] = [
     timestamp: "2024-09-18T19:00:00Z",
     source: "ChainTrace XAI De-Anonymization Core",
     integrity: "VERIFIED",
-    investigationId: "INV-2024-0401",
+    investigationId: "INV-002",
     size: "3.1 MB"
   },
   {
@@ -681,7 +681,7 @@ export const evidence: Evidence[] = [
     timestamp: "2024-09-19T08:30:00Z",
     source: "Polygon POS Validator Archive",
     integrity: "VERIFIED",
-    investigationId: "INV-2024-0718",
+    investigationId: "INV-003",
     size: "8.9 MB"
   }
 ];
@@ -755,7 +755,7 @@ export const timelineEvents: TimelineEvent[] = [
     timestamp: "2024-09-19T06:15:00Z",
     eventType: "ALERT",
     description: "NCRP 1930 Helpline Citizen Escalation: ₹48.5L digital arrest reported by Rajeshwar Sharma.",
-    investigationId: "INV-2024-0982",
+    investigationId: "INV-001",
     amount: 4850000,
     investigatorNote: "Immediate Golden Hour window opened (180 mins total)."
   },
@@ -767,7 +767,7 @@ export const timelineEvents: TimelineEvent[] = [
     txHash: "0x9e2b1f8d4c7a6e5b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b",
     amount: 54500,
     walletAddress: "TYDzsYUE3bmaipmxsioCGvPGMW5eN7Q6z3",
-    investigationId: "INV-2024-0982"
+    investigationId: "INV-001"
   },
   {
     id: "TLE-103",
@@ -775,7 +775,7 @@ export const timelineEvents: TimelineEvent[] = [
     eventType: "PATTERN_DETECTED",
     description: "Peeling chain automated transfer detected: 54,480 USDT transferred to intermediary layer.",
     txHash: "0x7c6b5a4f3e2d1c0b9e2b1f8d4c7a6e5b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d",
-    investigationId: "INV-2024-0982",
+    investigationId: "INV-001",
     investigatorNote: "Algorithmic script laundering pattern verified."
   },
   {
@@ -786,7 +786,7 @@ export const timelineEvents: TimelineEvent[] = [
     txHash: "0x3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b9e2b1f8d4c7a6e5b",
     amount: 54400,
     walletAddress: "TQn9Y2khEsLJW1ChVWFMSMeSTow5KaxUWF",
-    investigationId: "INV-2024-0982",
+    investigationId: "INV-001",
     investigatorNote: "VASP Interception target identified with 96% confidence."
   },
   {
@@ -794,7 +794,7 @@ export const timelineEvents: TimelineEvent[] = [
     timestamp: "2024-09-19T06:50:00Z",
     eventType: "EVIDENCE_COLLECTED",
     description: "Cryptographic Section 94 BNSS summons and Section 106 BNSS bank freeze notice drafted.",
-    investigationId: "INV-2024-0982",
+    investigationId: "INV-001",
     investigatorNote: "Mule Bank: State Bank of India CP Branch (A/C: 39482019482) placed on notice."
   },
   {
@@ -803,7 +803,7 @@ export const timelineEvents: TimelineEvent[] = [
     eventType: "ALERT",
     description: "Pig Butchering Fund Laundering: 18.42 ETH deposited into Tornado Cash Router.",
     txHash: "0x4f8a91b204c9e8d7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3",
-    investigationId: "INV-2024-0401"
+    investigationId: "INV-002"
   },
   {
     id: "TLE-107",
@@ -811,7 +811,7 @@ export const timelineEvents: TimelineEvent[] = [
     eventType: "ATTRIBUTION",
     description: "Tornado Cash de-anonymized output unmasked at WazirX deposit gateway (Amit V. KYC).",
     txHash: "0x1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c",
-    investigationId: "INV-2024-0401",
+    investigationId: "INV-002",
     investigatorNote: "Time-volume correlation confidence 93.2%."
   }
 ];

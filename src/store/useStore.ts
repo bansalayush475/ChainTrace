@@ -93,8 +93,8 @@ const INITIAL_REPORTS: GeneratedReport[] = [
   {
     id: "REP-2024-0982",
     title: "FIR-2024-DL-982314 Judicial Evidence Dossier",
-    investigation: "Digital Arrest & CBI Cyber Extortion Syndicate (Southeast Asia)",
-    investigationId: "INV-2024-0982",
+    investigation: "Digital Arrest & CBI Extortion Syndicate (Southeast Asia)",
+    investigationId: "INV-001",
     generatedAt: "2024-09-19T07:15:00.000Z",
     pages: 14,
     status: "FINAL",
@@ -116,7 +116,7 @@ const INITIAL_REPORTS: GeneratedReport[] = [
     id: "REP-2024-0401",
     title: "FIR-2024-MH-401928 Judicial Evidence Dossier",
     investigation: "Pig Butchering Investment Scam & Tornado Cash Laundering",
-    investigationId: "INV-2024-0401",
+    investigationId: "INV-002",
     generatedAt: "2024-09-18T20:30:00.000Z",
     pages: 9,
     status: "FINAL",
@@ -130,6 +130,25 @@ const INITIAL_REPORTS: GeneratedReport[] = [
       "Section 79A IT Act Electronic Evidence Certificate"
     ],
     notes: "Mathematical correlation proving 93.2% temporal confidence across FixedFloat bridge and Tornado Cash pool."
+  },
+  {
+    id: "REP-2024-0718",
+    title: "FIR-2024-KA-718291 Judicial Evidence Dossier",
+    investigation: "Work-From-Home Telegram Task Ponzi & High-Velocity Mule Ring",
+    investigationId: "INV-003",
+    generatedAt: "2024-09-19T08:45:00.000Z",
+    pages: 11,
+    status: "FINAL",
+    sections: [
+      "Executive Summary & Incident Metadata",
+      "Victim Suspect Wallet Intelligence & Risk Score",
+      "Multi-Hop Fund-Flow Graph Traversal",
+      "Destination Exchange / VASP Attribution Analysis",
+      "Wallet Clusters & Co-Spending Heuristics",
+      "Explainable AI (XAI) Deterministic Decision Tree",
+      "Section 79A IT Act Electronic Evidence Certificate"
+    ],
+    notes: "Automated peel-chain analysis isolating 14 domestic mule accounts across Karnataka banking switches."
   }
 ];
 
