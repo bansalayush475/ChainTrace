@@ -63,7 +63,7 @@ const itemVariants = {
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] },
+    transition: { duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number] },
   },
 };
 
@@ -424,6 +424,7 @@ export default function WalletAnalysisPage() {
 
   // Generate Freeze Notice Handlers
   function handleGenerateFreezeNotice() {
+    if (!wallet) return;
     const text = generateSection106BnssFreezeOrder({
       orderNo: `BNSS/S106/FREEZE/${wallet.address.slice(-6).toUpperCase()}`,
       policeStation: 'State Cyber Crime Investigation Headquarters',
@@ -431,7 +432,7 @@ export default function WalletAnalysisPage() {
       firNo: 'CR-2024-NCRP-8921',
       sectionsOfLaw: 'Sec 318(4), 316(2), 61(2) BNS 2023 r/w Sec 66D IT Act',
       vaspName: attribution.vasp.name,
-      vaspEmail: attribution.vasp.statutoryNoticeRecipient?.email || 'compliance-inbound@vasp.int',
+      vaspEmail: attribution.vasp.nodalOfficerEmail || 'compliance-inbound@vasp.int',
       targetWalletOrUid: wallet.address,
       taintedAmount: `${wallet.balance.toFixed(4)} ${effectiveChain === 'TRON' ? 'USDT' : effectiveChain === 'BTC' ? 'BTC' : 'ETH'} (~$${formatUSD(wallet.totalReceived)})`,
       investigatingOfficer: user?.name || 'Cyber Forensic Examiner',
@@ -442,6 +443,7 @@ export default function WalletAnalysisPage() {
   }
 
   function handleGenerateBsaCert() {
+    if (!wallet) return;
     const text = generateSection63BsaCertificate({
       certificateNo: `BSA-WALLET-${wallet.address.slice(-6).toUpperCase()}`,
       investigationId: 'INV-LIVE',

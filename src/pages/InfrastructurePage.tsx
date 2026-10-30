@@ -18,12 +18,25 @@ const itemVariants = {
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.32, ease: [0.25, 0.46, 0.45, 0.94] },
+    transition: { duration: 0.32, ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number] },
   },
 };
 
+interface LeaNode {
+  id: string;
+  name: string;
+  blockchain: 'TRON' | 'ETH' | 'BTC' | 'POLYGON';
+  endpoint: string;
+  status: 'ONLINE' | 'OFFLINE' | 'DEGRADED';
+  latencyMs: number;
+  lastBlock: number;
+  syncPercent: number;
+  requestsPerMin: number;
+  lastUpdated: string;
+}
+
 // Fallback nodes if API is fully unreachable
-const DEFAULT_LEA_NODES = [
+const DEFAULT_LEA_NODES: LeaNode[] = [
   {
     id: 'node-tron-01',
     name: 'TronGrid Enterprise Gateway',

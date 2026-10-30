@@ -35,6 +35,17 @@ import {
 } from "../services/databaseService";
 import { api } from "../services/apiService";
 
+export type {
+  Investigation,
+  Alert,
+  Wallet,
+  Evidence,
+  AuditLog,
+  WatchlistItem,
+  Transaction,
+  TimelineEvent,
+};
+
 export interface User {
   id?: string;
   name: string;

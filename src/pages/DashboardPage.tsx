@@ -45,7 +45,7 @@ const LIVE_ALERT_MESSAGES = [
   { severity: 'LOW' as const, message: 'New counterparty detected on watchlisted wallet 0xD1E2...D9E0', type: 'WATCHLIST_TRIGGER' },
 ];
 
-const containerVariants = {
+const containerVariants: any = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -56,7 +56,7 @@ const containerVariants = {
   },
 };
 
-const itemVariants = {
+const itemVariants: any = {
   hidden: { opacity: 0, y: 14 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } },
 };

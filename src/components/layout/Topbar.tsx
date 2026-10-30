@@ -368,7 +368,9 @@ export default function Topbar() {
                             }}
                             style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}
                           >
-                            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '2px' }}>{alert.title}</div>
+                            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '2px' }}>
+                              {(alert as any).title || (alert.type ? alert.type.replace(/_/g, ' ') : 'Alert')}
+                            </div>
                             <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {alert.message}
                             </div>

@@ -61,6 +61,7 @@ export interface Transaction {
     | "EXCHANGE_WITHDRAWAL";
   riskScore: number;
   flags: string[];
+  investigationId?: string;
 }
 
 export interface Alert {
@@ -149,6 +150,7 @@ export interface TimelineEvent {
   amount?: number;
   walletAddress?: string;
   investigatorNote?: string;
+  actor?: string;
   investigationId: string;
 }
 
@@ -158,13 +160,16 @@ export interface AuditLog {
   user: string;
   action:
     | "LOGIN"
+    | "LOGOUT"
     | "WALLET_LOOKUP"
     | "INVESTIGATION_CREATE"
     | "EVIDENCE_EXPORT"
     | "REPORT_GENERATE"
     | "ALERT_DISMISS"
     | "WATCHLIST_ADD"
-    | "SETTINGS_CHANGE";
+    | "SETTINGS_CHANGE"
+    | "PASSWORD_CHANGE"
+    | string;
   resource: string;
   ip: string;
   session: string;

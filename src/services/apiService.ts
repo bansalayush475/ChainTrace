@@ -601,6 +601,7 @@ interface LocalOfficer {
   id: string;
   name: string;
   email: string;
+  password?: string;
   passwordHash?: string;
   team: string;
   role: string;

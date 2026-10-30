@@ -149,7 +149,14 @@ export default function TransactionDetailsModal({ transaction, isOpen, onClose }
                       <span style={{ width: '130px', color: 'var(--text-secondary)', fontSize: '13px' }}>Transaction Hash:</span>
                       <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '13px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         {truncateAddress(transaction.hash, 10)}
-                        <Link size={14} style={{ color: 'var(--text-secondary)', cursor: 'pointer' }} onClick={() => navigator.clipboard.writeText(transaction.hash)} title="Copy Full Hash" />
+                        <button
+                          type="button"
+                          onClick={() => navigator.clipboard.writeText(transaction.hash)}
+                          title="Copy Full Hash"
+                          style={{ background: 'none', border: 'none', padding: 0, display: 'inline-flex', cursor: 'pointer' }}
+                        >
+                          <Link size={14} style={{ color: 'var(--text-secondary)' }} />
+                        </button>
                       </span>
                     </div>
 
@@ -279,7 +286,7 @@ export default function TransactionDetailsModal({ transaction, isOpen, onClose }
                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '6px' }}>Intelligence Flags</div>
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       {transaction.flags && transaction.flags.length > 0 ? (
-                        transaction.flags.map(f => (
+                        transaction.flags.map((f: string) => (
                           <span key={f} style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--risk-critical)', border: '1px solid rgba(239,68,68,0.2)', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
                             {f}
                           </span>
