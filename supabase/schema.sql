@@ -14,20 +14,26 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- 1. USERS TABLE (Law Enforcement Officers & Forensic Examiners)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS users (
-    id VARCHAR(64) PRIMARY KEY,
+    id VARCHAR(128) PRIMARY KEY,
     email VARCHAR(128) UNIQUE NOT NULL,
-    password_hash VARCHAR(128) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
     name VARCHAR(128) NOT NULL,
     team VARCHAR(128) NOT NULL DEFAULT 'Special Cell Cyber Operations (Northern Command)',
-    role VARCHAR(64) NOT NULL DEFAULT 'Lead Crypto Forensic Specialist',
+    role VARCHAR(128) NOT NULL DEFAULT 'Lead Crypto Forensic Specialist',
     role_type VARCHAR(16) NOT NULL DEFAULT 'SENIOR' CHECK (role_type IN ('SENIOR', 'JUNIOR')),
-    clearance_level VARCHAR(64) NOT NULL DEFAULT 'LEVEL-4 TOP SECRET',
-    badge_no VARCHAR(64),
+    clearance_level VARCHAR(128) NOT NULL DEFAULT 'LEVEL-4 TOP SECRET',
+    badge_no VARCHAR(128),
     jurisdiction VARCHAR(128) DEFAULT 'Delhi Police Cyber Crime PS (Special Cell)',
-    avatar VARCHAR(8) DEFAULT 'CF',
+    avatar VARCHAR(16) DEFAULT 'CF',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     last_login TIMESTAMPTZ
 );
+
+-- Upgrade existing tables if already created with shorter lengths
+ALTER TABLE users ALTER COLUMN id TYPE VARCHAR(128);
+ALTER TABLE users ALTER COLUMN role TYPE VARCHAR(128);
+ALTER TABLE users ALTER COLUMN clearance_level TYPE VARCHAR(128);
+ALTER TABLE users ALTER COLUMN badge_no TYPE VARCHAR(128);
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_team ON users(team);
@@ -36,8 +42,8 @@ CREATE INDEX IF NOT EXISTS idx_users_team ON users(team);
 -- 2. INVESTIGATIONS TABLE (Formal Crime Dockets & Case Traversal Records)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS investigations (
-    id VARCHAR(64) PRIMARY KEY,
-    case_id VARCHAR(64) UNIQUE NOT NULL,
+    id VARCHAR(128) PRIMARY KEY,
+    case_id VARCHAR(128) UNIQUE NOT NULL,
     title VARCHAR(255) NOT NULL,
     suspect_wallet VARCHAR(128) NOT NULL,
     blockchain VARCHAR(32) NOT NULL DEFAULT 'ETH',
@@ -54,6 +60,10 @@ CREATE TABLE IF NOT EXISTS investigations (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Upgrade existing table columns
+ALTER TABLE investigations ALTER COLUMN id TYPE VARCHAR(128);
+ALTER TABLE investigations ALTER COLUMN case_id TYPE VARCHAR(128);
+
 CREATE INDEX IF NOT EXISTS idx_investigations_case_id ON investigations(case_id);
 CREATE INDEX IF NOT EXISTS idx_investigations_status ON investigations(status);
 CREATE INDEX IF NOT EXISTS idx_investigations_suspect_wallet ON investigations(suspect_wallet);
@@ -63,8 +73,8 @@ CREATE INDEX IF NOT EXISTS idx_investigations_created_at ON investigations(creat
 -- 3. CASE TIMELINE EVENTS TABLE (Section 79A IT Act Chain of Custody)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS timeline_events (
-    id VARCHAR(64) PRIMARY KEY,
-    investigation_id VARCHAR(64) REFERENCES investigations(id) ON DELETE CASCADE,
+    id VARCHAR(128) PRIMARY KEY,
+    investigation_id VARCHAR(128) REFERENCES investigations(id) ON DELETE CASCADE,
     timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     event_type VARCHAR(32) NOT NULL CHECK (event_type IN ('TRANSACTION', 'ALERT', 'INVESTIGATION_UPDATE', 'EVIDENCE_COLLECTED', 'PATTERN_DETECTED', 'ATTRIBUTION', 'ESCALATION')),
     description TEXT NOT NULL,
@@ -75,6 +85,10 @@ CREATE TABLE IF NOT EXISTS timeline_events (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Upgrade existing table columns
+ALTER TABLE timeline_events ALTER COLUMN id TYPE VARCHAR(128);
+ALTER TABLE timeline_events ALTER COLUMN investigation_id TYPE VARCHAR(128);
+
 CREATE INDEX IF NOT EXISTS idx_timeline_investigation_id ON timeline_events(investigation_id);
 CREATE INDEX IF NOT EXISTS idx_timeline_timestamp ON timeline_events(timestamp DESC);
 
@@ -82,11 +96,11 @@ CREATE INDEX IF NOT EXISTS idx_timeline_timestamp ON timeline_events(timestamp D
 -- 4. EVIDENCE VAULT TABLE (Section 63 BSA 2023 Digital Exhibits & Hash Seals)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS evidence_vault (
-    id VARCHAR(64) PRIMARY KEY,
-    investigation_id VARCHAR(64) REFERENCES investigations(id) ON DELETE CASCADE,
+    id VARCHAR(128) PRIMARY KEY,
+    investigation_id VARCHAR(128) REFERENCES investigations(id) ON DELETE CASCADE,
     title VARCHAR(255) NOT NULL,
     type VARCHAR(32) NOT NULL CHECK (type IN ('TRANSACTION_RECEIPT', 'WALLET_SNAPSHOT', 'GRAPH_EXPORT', 'STATUTORY_NOTICE', 'EXCHANGE_SUBPOENA', 'FORENSIC_REPORT', 'CHAIN_ANALYSIS')),
-    hash VARCHAR(64) NOT NULL, -- Cryptographic SHA-256 Digest
+    hash VARCHAR(128) NOT NULL, -- Cryptographic SHA-256 Digest (Supports 0x prefix = 66 chars)
     file_size VARCHAR(32) NOT NULL DEFAULT '128 KB',
     source VARCHAR(128) NOT NULL DEFAULT 'Sovereign Node RPC',
     description TEXT,
@@ -94,6 +108,11 @@ CREATE TABLE IF NOT EXISTS evidence_vault (
     verified BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Upgrade existing table columns to prevent 22001 errors
+ALTER TABLE evidence_vault ALTER COLUMN id TYPE VARCHAR(128);
+ALTER TABLE evidence_vault ALTER COLUMN investigation_id TYPE VARCHAR(128);
+ALTER TABLE evidence_vault ALTER COLUMN hash TYPE VARCHAR(128);
 
 CREATE INDEX IF NOT EXISTS idx_evidence_investigation ON evidence_vault(investigation_id);
 CREATE INDEX IF NOT EXISTS idx_evidence_hash ON evidence_vault(hash);
@@ -115,11 +134,15 @@ CREATE TABLE IF NOT EXISTS wallets (
     last_activity TIMESTAMPTZ,
     counterparties INTEGER NOT NULL DEFAULT 0,
     flags TEXT[] DEFAULT ARRAY[]::TEXT[],
-    cluster VARCHAR(64),
-    exchange VARCHAR(64),
+    cluster VARCHAR(128),
+    exchange VARCHAR(128),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Upgrade existing table columns
+ALTER TABLE wallets ALTER COLUMN cluster TYPE VARCHAR(128);
+ALTER TABLE wallets ALTER COLUMN exchange TYPE VARCHAR(128);
 
 CREATE INDEX IF NOT EXISTS idx_wallets_entity_type ON wallets(entity_type);
 CREATE INDEX IF NOT EXISTS idx_wallets_risk_score ON wallets(risk_score DESC);
@@ -142,9 +165,12 @@ CREATE TABLE IF NOT EXISTS transactions (
     risk_score INTEGER NOT NULL DEFAULT 50,
     type VARCHAR(32) NOT NULL DEFAULT 'TRANSFER',
     blockchain VARCHAR(32) NOT NULL DEFAULT 'ETH',
-    investigation_id VARCHAR(64) REFERENCES investigations(id) ON DELETE SET NULL,
+    investigation_id VARCHAR(128) REFERENCES investigations(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Upgrade existing table columns
+ALTER TABLE transactions ALTER COLUMN investigation_id TYPE VARCHAR(128);
 
 CREATE INDEX IF NOT EXISTS idx_transactions_from ON transactions(from_address);
 CREATE INDEX IF NOT EXISTS idx_transactions_to ON transactions(to_address);
@@ -154,14 +180,14 @@ CREATE INDEX IF NOT EXISTS idx_transactions_investigation ON transactions(invest
 -- 7. 1930 CITIZEN CYBER HELPLINE INTAKE TABLE (NCRP Portal Ingestion)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS ncrp_complaints (
-    id VARCHAR(64) PRIMARY KEY,
-    ack_no VARCHAR(64) UNIQUE NOT NULL,
+    id VARCHAR(128) PRIMARY KEY,
+    ack_no VARCHAR(128) UNIQUE NOT NULL,
     victim_name VARCHAR(128) NOT NULL,
     contact_phone VARCHAR(32),
     loss_inr NUMERIC(20, 2) NOT NULL,
     suspect_wallet VARCHAR(128) NOT NULL,
     blockchain VARCHAR(32) NOT NULL DEFAULT 'TRON',
-    bank_utr VARCHAR(64),
+    bank_utr VARCHAR(128),
     upi_vpa VARCHAR(128),
     crime_category VARCHAR(128) NOT NULL DEFAULT 'Digital Arrest & Financial Cyber Extortion',
     source_channel VARCHAR(32) NOT NULL DEFAULT '1930_HELPLINE',
@@ -170,6 +196,11 @@ CREATE TABLE IF NOT EXISTS ncrp_complaints (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Upgrade existing table columns
+ALTER TABLE ncrp_complaints ALTER COLUMN id TYPE VARCHAR(128);
+ALTER TABLE ncrp_complaints ALTER COLUMN ack_no TYPE VARCHAR(128);
+ALTER TABLE ncrp_complaints ALTER COLUMN bank_utr TYPE VARCHAR(128);
+
 CREATE INDEX IF NOT EXISTS idx_ncrp_ack_no ON ncrp_complaints(ack_no);
 CREATE INDEX IF NOT EXISTS idx_ncrp_status ON ncrp_complaints(status);
 
@@ -177,20 +208,26 @@ CREATE INDEX IF NOT EXISTS idx_ncrp_status ON ncrp_complaints(status);
 -- 8. STATUTORY FREEZE NOTICES TABLE (Section 94 BNSS & Section 106 BNSS)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS freeze_notices (
-    id VARCHAR(64) PRIMARY KEY,
-    dispatch_ref VARCHAR(64) UNIQUE NOT NULL,
+    id VARCHAR(128) PRIMARY KEY,
+    dispatch_ref VARCHAR(128) UNIQUE NOT NULL,
     notice_type VARCHAR(32) NOT NULL CHECK (notice_type IN ('VASP_SUBPOENA_SEC94_BNSS', 'BANK_FREEZE_SEC106_BNSS')),
     target_entity VARCHAR(128) NOT NULL,
     target_identifier VARCHAR(128) NOT NULL,
-    case_reference VARCHAR(64) NOT NULL,
+    case_reference VARCHAR(128) NOT NULL,
     recipient_email VARCHAR(128) NOT NULL,
-    sha256_seal VARCHAR(64) NOT NULL,
+    sha256_seal VARCHAR(128) NOT NULL, -- Supports 0x prefix = 66 chars
     status VARCHAR(32) NOT NULL DEFAULT 'DISPATCHED' CHECK (status IN ('DRAFT', 'DISPATCHED', 'ACKNOWLEDGED', 'FROZEN', 'REJECTED')),
     full_notice_text TEXT NOT NULL,
     dispatched_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     acknowledged_at TIMESTAMPTZ,
     frozen_at TIMESTAMPTZ
 );
+
+-- Upgrade existing table columns to prevent 22001 errors
+ALTER TABLE freeze_notices ALTER COLUMN id TYPE VARCHAR(128);
+ALTER TABLE freeze_notices ALTER COLUMN dispatch_ref TYPE VARCHAR(128);
+ALTER TABLE freeze_notices ALTER COLUMN case_reference TYPE VARCHAR(128);
+ALTER TABLE freeze_notices ALTER COLUMN sha256_seal TYPE VARCHAR(128);
 
 CREATE INDEX IF NOT EXISTS idx_freeze_ref ON freeze_notices(dispatch_ref);
 CREATE INDEX IF NOT EXISTS idx_freeze_status ON freeze_notices(status);
@@ -199,16 +236,22 @@ CREATE INDEX IF NOT EXISTS idx_freeze_status ON freeze_notices(status);
 -- 9. IMMUTABLE AUDIT LOGS TABLE (Section 63 BSA 2023 Tamper-Evident Ledger)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS audit_logs (
-    id VARCHAR(64) PRIMARY KEY,
+    id VARCHAR(128) PRIMARY KEY,
     timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     "user" VARCHAR(128) NOT NULL,
-    action VARCHAR(64) NOT NULL,
+    action VARCHAR(128) NOT NULL,
     resource VARCHAR(128) NOT NULL,
     ip VARCHAR(64) NOT NULL DEFAULT '127.0.0.1',
-    session VARCHAR(64) NOT NULL DEFAULT 'SESSION-SECURE-SOVEREIGN',
+    session VARCHAR(128) NOT NULL DEFAULT 'SESSION-SECURE-SOVEREIGN',
     details TEXT NOT NULL,
-    integrity_hash VARCHAR(64)
+    integrity_hash VARCHAR(128) -- Supports 0x prefix = 66 chars
 );
+
+-- Upgrade existing table columns to prevent 22001 errors
+ALTER TABLE audit_logs ALTER COLUMN id TYPE VARCHAR(128);
+ALTER TABLE audit_logs ALTER COLUMN action TYPE VARCHAR(128);
+ALTER TABLE audit_logs ALTER COLUMN session TYPE VARCHAR(128);
+ALTER TABLE audit_logs ALTER COLUMN integrity_hash TYPE VARCHAR(128);
 
 CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_logs(timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_logs(action);
