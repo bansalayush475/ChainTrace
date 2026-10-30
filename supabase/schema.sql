@@ -29,7 +29,6 @@ CREATE TABLE IF NOT EXISTS users (
     last_login TIMESTAMPTZ
 );
 
--- Upgrade existing tables if already created with shorter lengths
 ALTER TABLE users ALTER COLUMN id TYPE VARCHAR(128);
 ALTER TABLE users ALTER COLUMN role TYPE VARCHAR(128);
 ALTER TABLE users ALTER COLUMN clearance_level TYPE VARCHAR(128);
@@ -60,7 +59,6 @@ CREATE TABLE IF NOT EXISTS investigations (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Upgrade existing table columns
 ALTER TABLE investigations ALTER COLUMN id TYPE VARCHAR(128);
 ALTER TABLE investigations ALTER COLUMN case_id TYPE VARCHAR(128);
 
@@ -85,7 +83,6 @@ CREATE TABLE IF NOT EXISTS timeline_events (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Upgrade existing table columns
 ALTER TABLE timeline_events ALTER COLUMN id TYPE VARCHAR(128);
 ALTER TABLE timeline_events ALTER COLUMN investigation_id TYPE VARCHAR(128);
 
@@ -100,7 +97,7 @@ CREATE TABLE IF NOT EXISTS evidence_vault (
     investigation_id VARCHAR(128) REFERENCES investigations(id) ON DELETE CASCADE,
     title VARCHAR(255) NOT NULL,
     type VARCHAR(32) NOT NULL CHECK (type IN ('TRANSACTION_RECEIPT', 'WALLET_SNAPSHOT', 'GRAPH_EXPORT', 'STATUTORY_NOTICE', 'EXCHANGE_SUBPOENA', 'FORENSIC_REPORT', 'CHAIN_ANALYSIS')),
-    hash VARCHAR(128) NOT NULL, -- Cryptographic SHA-256 Digest (Supports 0x prefix = 66 chars)
+    hash VARCHAR(128) NOT NULL,
     file_size VARCHAR(32) NOT NULL DEFAULT '128 KB',
     source VARCHAR(128) NOT NULL DEFAULT 'Sovereign Node RPC',
     description TEXT,
@@ -109,7 +106,6 @@ CREATE TABLE IF NOT EXISTS evidence_vault (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Upgrade existing table columns to prevent 22001 errors
 ALTER TABLE evidence_vault ALTER COLUMN id TYPE VARCHAR(128);
 ALTER TABLE evidence_vault ALTER COLUMN investigation_id TYPE VARCHAR(128);
 ALTER TABLE evidence_vault ALTER COLUMN hash TYPE VARCHAR(128);
@@ -140,7 +136,6 @@ CREATE TABLE IF NOT EXISTS wallets (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Upgrade existing table columns
 ALTER TABLE wallets ALTER COLUMN cluster TYPE VARCHAR(128);
 ALTER TABLE wallets ALTER COLUMN exchange TYPE VARCHAR(128);
 
@@ -169,7 +164,6 @@ CREATE TABLE IF NOT EXISTS transactions (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Upgrade existing table columns
 ALTER TABLE transactions ALTER COLUMN investigation_id TYPE VARCHAR(128);
 
 CREATE INDEX IF NOT EXISTS idx_transactions_from ON transactions(from_address);
@@ -196,7 +190,6 @@ CREATE TABLE IF NOT EXISTS ncrp_complaints (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Upgrade existing table columns
 ALTER TABLE ncrp_complaints ALTER COLUMN id TYPE VARCHAR(128);
 ALTER TABLE ncrp_complaints ALTER COLUMN ack_no TYPE VARCHAR(128);
 ALTER TABLE ncrp_complaints ALTER COLUMN bank_utr TYPE VARCHAR(128);
@@ -215,7 +208,7 @@ CREATE TABLE IF NOT EXISTS freeze_notices (
     target_identifier VARCHAR(128) NOT NULL,
     case_reference VARCHAR(128) NOT NULL,
     recipient_email VARCHAR(128) NOT NULL,
-    sha256_seal VARCHAR(128) NOT NULL, -- Supports 0x prefix = 66 chars
+    sha256_seal VARCHAR(128) NOT NULL,
     status VARCHAR(32) NOT NULL DEFAULT 'DISPATCHED' CHECK (status IN ('DRAFT', 'DISPATCHED', 'ACKNOWLEDGED', 'FROZEN', 'REJECTED')),
     full_notice_text TEXT NOT NULL,
     dispatched_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -223,7 +216,6 @@ CREATE TABLE IF NOT EXISTS freeze_notices (
     frozen_at TIMESTAMPTZ
 );
 
--- Upgrade existing table columns to prevent 22001 errors
 ALTER TABLE freeze_notices ALTER COLUMN id TYPE VARCHAR(128);
 ALTER TABLE freeze_notices ALTER COLUMN dispatch_ref TYPE VARCHAR(128);
 ALTER TABLE freeze_notices ALTER COLUMN case_reference TYPE VARCHAR(128);
@@ -244,10 +236,9 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     ip VARCHAR(64) NOT NULL DEFAULT '127.0.0.1',
     session VARCHAR(128) NOT NULL DEFAULT 'SESSION-SECURE-SOVEREIGN',
     details TEXT NOT NULL,
-    integrity_hash VARCHAR(128) -- Supports 0x prefix = 66 chars
+    integrity_hash VARCHAR(128)
 );
 
--- Upgrade existing table columns to prevent 22001 errors
 ALTER TABLE audit_logs ALTER COLUMN id TYPE VARCHAR(128);
 ALTER TABLE audit_logs ALTER COLUMN action TYPE VARCHAR(128);
 ALTER TABLE audit_logs ALTER COLUMN session TYPE VARCHAR(128);
@@ -306,7 +297,7 @@ DO $$ BEGIN
 END $$;
 
 -- ==============================================================================
--- 11. GENUINE CASE DATASET INSERTION (Interlinked, Distinct & Professional)
+-- 11. GENUINE CASE DATASET INSERTION (With Safe Idempotent UPSERT on all unique keys)
 -- ==============================================================================
 
 -- A. Standard Primary Case Dockets
@@ -319,7 +310,7 @@ VALUES
 ('INV-003', 'FIR-2024-KA-718291', 'Work-From-Home Telegram Task Ponzi & High-Velocity Mule Ring', '0x95aD61b0a150d79219dCF64E1E6Cc01f0B64C4cE', 'POLYGON', 86, 3200000.00, 'INR', 'Karnataka Cyber Crime PS (Bengaluru)', 'ANALYZING', 'HIGH', 'Victims recruited via Telegram to perform YouTube video rating tasks. Deposit funds split through 14 Polygon wallets in 8 minutes. Correlated with Karnataka mule network bank accounts.', ARRAY['telegram-scam', 'polygon-peeling', 'task-fraud', 'upi-mules'], 'Karnataka Cyber Crime PS (Bengaluru)', '2024-09-15 09:40:00+00', NOW()),
 
 ('INV-024', 'CT-2024-0914', 'Operation Sovereign Sentinel - High-Yield Investment Fraud', '0x71C839019284102948102948102948102a', 'ETH', 88, 1450000.00, 'ETH', 'ayush', 'UNDER_INVESTIGATION', 'HIGH', 'Forensic investigation docket opened for suspect Ethereum wallet tracing. Target unhosted wallet flagged for automated peeling into domestic exchange exit nodes.', ARRAY['ncrp-intake', 'cyber-fraud', 'freeze-ready', 'evm-peeling'], 'Delhi Police Cyber Crime PS (Special Cell)', '2026-10-26 08:51:00+00', NOW())
-ON CONFLICT (id) DO UPDATE SET
+ON CONFLICT (case_id) DO UPDATE SET
     title = EXCLUDED.title,
     suspect_wallet = EXCLUDED.suspect_wallet,
     risk_score = EXCLUDED.risk_score,
@@ -369,17 +360,18 @@ INSERT INTO freeze_notices (id, dispatch_ref, notice_type, target_entity, target
 VALUES
 ('FRZ-001', 'FREEZE-DL-982314-001', 'VASP_SUBPOENA_SEC94_BNSS', 'Binance Compliance & FIU Nodal Desk', 'UID-89104231 (TQn9Y2khEsLJW1ChVWFMSMeSTow5KaxUWF)', 'FIR-2024-DL-982314', 'compliance@binance.com', '0x7f81a9420b92da10482c1998ab81e912f7182940294810294810294810294810', 'ACKNOWLEDGED', 'EMERGENCY REQUISITION UNDER SECTION 94 BNSS 2023: Take notice that cryptocurrency assets amounting to 54,400 USDT deposited into UID-89104231 are proceeds of cyber extortion under FIR-2024-DL-982314. You are hereby ordered to immediately execute a total debit freeze.', '2024-09-15 08:35:00+00', '2024-09-15 08:52:00+00', '2024-09-15 09:10:00+00'),
 ('FRZ-002', 'FREEZE-MH-401928-001', 'VASP_SUBPOENA_SEC94_BNSS', 'WazirX (Zanmai Labs Pvt Ltd)', 'UID-19284 (0x498b31a294810294810294810294810294814b29)', 'FIR-2024-MH-401928', 'nodal@wazirx.com', '0x4f8a91b204c9e8d7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3', 'DISPATCHED', 'STATUTORY DIRECTIVE UNDER SECTION 94 BNSS 2023: Immediate preservation and debit freeze of account UID-19284 associated with Tornado Cash de-anonymized funds under FIR-2024-MH-401928.', '2024-09-19 07:15:00+00', NULL, NULL)
-ON CONFLICT (id) DO UPDATE SET
+ON CONFLICT (dispatch_ref) DO UPDATE SET
     status = EXCLUDED.status;
 
--- F. NCRP 1930 Citizen Helpline Complaints
+-- F. NCRP 1930 Citizen Helpline Complaints (UPSERT on unique ack_no)
 INSERT INTO ncrp_complaints (id, ack_no, victim_name, contact_phone, loss_inr, suspect_wallet, blockchain, bank_utr, upi_vpa, crime_category, source_channel, status, golden_window_expires_at, created_at)
 VALUES
 ('NCRP-001', '2024/NCRP/DL/982314', 'Ramesh Chandra (Senior Citizen)', '+91 98112 40192', 4850000.00, 'TYDzsYUE3bmaipmxsioCGvPGMW5eN7Q6z3', 'TRON', 'UTR-SBI-20240915-0912', 'escrow.mule4@okaxis', 'Digital Arrest & CBI Extortion', '1930_HELPLINE', 'ESCALATED_TO_CASE', '2024-09-15 11:00:00+00', '2024-09-15 08:00:00+00'),
 ('NCRP-002', '2024/NCRP/MH/401928', 'Anita Deshmukh', '+91 98201 39182', 12500000.00, '0x71C839019284102948102948102948102a', 'ETH', 'UTR-HDFC-20240908-4410', 'invest.crypto9@ybl', 'Pig Butchering Investment Fraud', '1930_HELPLINE', 'ESCALATED_TO_CASE', '2024-09-08 17:00:00+00', '2024-09-08 14:00:00+00'),
 ('NCRP-003', '2024/NCRP/KA/718291', 'Vikram Rao', '+91 97410 88291', 3200000.00, '0x95aD61b0a150d79219dCF64E1E6Cc01f0B64C4cE', 'POLYGON', 'UTR-ICICI-20240915-1829', 'task.rating7@icici', 'Telegram Task & Merchant Rating Scam', '1930_HELPLINE', 'ANALYZING', '2024-09-15 14:00:00+00', '2024-09-15 09:20:00+00')
-ON CONFLICT (id) DO UPDATE SET
-    status = EXCLUDED.status;
+ON CONFLICT (ack_no) DO UPDATE SET
+    status = EXCLUDED.status,
+    loss_inr = EXCLUDED.loss_inr;
 
 -- G. Audit Trail
 INSERT INTO audit_logs (id, timestamp, "user", action, resource, ip, session, details, integrity_hash)
