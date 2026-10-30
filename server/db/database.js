@@ -617,6 +617,8 @@ export const db = {
   async updateInvestigation(id, updates) {
     const now = new Date().toISOString();
     const supabase = getSupabase();
+    let supabaseUpdated = null;
+
     if (supabase) {
       try {
         const supaUpdates = {};
@@ -625,23 +627,44 @@ export const db = {
         if (updates.priority !== undefined) supaUpdates.priority = updates.priority;
         if (updates.description !== undefined) supaUpdates.description = updates.description;
         if (updates.investigator !== undefined) supaUpdates.investigator = updates.investigator;
+        if (updates.blockchain !== undefined) supaUpdates.blockchain = updates.blockchain;
+        if (updates.suspectWallet !== undefined || updates.suspect_wallet !== undefined) {
+          supaUpdates.suspect_wallet = updates.suspectWallet || updates.suspect_wallet;
+        }
         if (updates.riskScore !== undefined || updates.risk_score !== undefined) {
-          supaUpdates.risk_score = updates.riskScore !== undefined ? updates.riskScore : updates.risk_score;
+          supaUpdates.risk_score = updates.riskScore !== undefined ? Number(updates.riskScore) : Number(updates.risk_score);
         }
         if (updates.fundsTraced !== undefined || updates.funds_traced !== undefined) {
-          supaUpdates.funds_traced = updates.fundsTraced !== undefined ? updates.fundsTraced : updates.funds_traced;
+          supaUpdates.funds_traced = updates.fundsTraced !== undefined ? Number(updates.fundsTraced) : Number(updates.funds_traced);
         }
+        if (updates.currency !== undefined) supaUpdates.currency = updates.currency;
+        if (updates.tags !== undefined) supaUpdates.tags = Array.isArray(updates.tags) ? updates.tags : [];
         supaUpdates.updated_at = now;
-        await supabase.from('investigations').update(supaUpdates).or(`id.eq.${id},case_id.eq.${id}`);
+
+        const { data, error } = await supabase
+          .from('investigations')
+          .update(supaUpdates)
+          .or(`id.eq.${id},case_id.eq.${id}`)
+          .select()
+          .maybeSingle();
+
+        if (!error && data) {
+          supabaseUpdated = fromSupabaseInvestigation(data);
+        } else if (error) {
+          console.warn('[Supabase Warning] updateInvestigation:', error.message);
+        }
       } catch (err) {
         console.warn('[Supabase Warning] updateInvestigation:', err.message);
       }
     }
 
-    const idx = (memoryDb.investigations || []).findIndex((inv) => inv.id === id || inv.caseId === id || inv.case_id === id);
+    if (!memoryDb.investigations) memoryDb.investigations = [];
+    const idx = memoryDb.investigations.findIndex((inv) => inv.id === id || inv.caseId === id || inv.case_id === id);
+
     if (idx !== -1) {
       memoryDb.investigations[idx] = {
         ...memoryDb.investigations[idx],
+        ...(supabaseUpdated || {}),
         ...updates,
         updatedAt: now,
         updated_at: now,
@@ -649,6 +672,13 @@ export const db = {
       writeLocalDb(memoryDb);
       return memoryDb.investigations[idx];
     }
+
+    if (supabaseUpdated) {
+      memoryDb.investigations.unshift(supabaseUpdated);
+      writeLocalDb(memoryDb);
+      return supabaseUpdated;
+    }
+
     return null;
   },
 
@@ -1151,4 +1181,44 @@ export const db = {
     writeLocalDb(memoryDb);
     return { success: true, message: 'Database reset to clean sovereign slate' };
   },
+
+  // Synchronize memory and local atomic file storage with Supabase
+  async syncFromSupabase() {
+    const supabase = getSupabase();
+    if (!supabase) return false;
+    try {
+      const [invRes, walRes, txRes, evRes, tleRes] = await Promise.all([
+        supabase.from('investigations').select('*').order('created_at', { ascending: false }),
+        supabase.from('wallets').select('*').order('risk_score', { ascending: false }),
+        supabase.from('transactions').select('*').order('timestamp', { ascending: false }),
+        supabase.from('evidence_vault').select('*').order('created_at', { ascending: false }),
+        supabase.from('timeline_events').select('*').order('created_at', { ascending: true }),
+      ]);
+
+      if (invRes.data && invRes.data.length > 0) {
+        memoryDb.investigations = invRes.data.map(fromSupabaseInvestigation);
+      }
+      if (walRes.data && walRes.data.length > 0) {
+        memoryDb.wallets = walRes.data.map(fromSupabaseWallet);
+      }
+      if (txRes.data && txRes.data.length > 0) {
+        memoryDb.transactions = txRes.data.map(fromSupabaseTransaction);
+      }
+      if (evRes.data && evRes.data.length > 0) {
+        memoryDb.evidence = evRes.data.map(fromSupabaseEvidence);
+      }
+      if (tleRes.data && tleRes.data.length > 0) {
+        memoryDb.timeline_events = tleRes.data.map(fromSupabaseTimeline);
+      }
+      writeLocalDb(memoryDb);
+      console.log(`[DB Engine] Synced with Supabase: ${memoryDb.investigations.length} investigations, ${memoryDb.wallets.length} wallets, ${memoryDb.transactions.length} txs.`);
+      return true;
+    } catch (err) {
+      console.warn('[DB Engine] syncFromSupabase error:', err.message);
+      return false;
+    }
+  },
 };
+
+// Auto-trigger sync from Supabase on module load
+db.syncFromSupabase().catch(() => {});
