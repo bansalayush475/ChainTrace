@@ -584,6 +584,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   deleteInvestigation: (id) => {
     dbDeleteInvestigation(id).catch(console.warn);
+    api.deleteInvestigation(id).catch((err) => console.warn('Backend delete investigation sync:', err));
     dbGetStats().then((stats) => set({ dbStats: stats })).catch(() => {});
     set((state) => ({
       investigations: state.investigations.filter((i) => i.id !== id),

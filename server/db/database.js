@@ -612,9 +612,29 @@ export const db = {
       }
     }
 
+    if (memoryDb.meta && memoryDb.meta.clearedAt) {
+      delete memoryDb.meta.clearedAt;
+    }
+    if (!memoryDb.investigations) memoryDb.investigations = [];
     memoryDb.investigations.unshift(newRecord);
     writeLocalDb(memoryDb);
     return newRecord;
+  },
+
+  async deleteInvestigation(id) {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        await supabase.from('investigations').delete().or(`id.eq.${id},case_id.eq.${id}`);
+      } catch (err) {
+        console.warn('[Supabase Exception] deleteInvestigation:', err.message);
+      }
+    }
+    if (memoryDb.investigations) {
+      memoryDb.investigations = memoryDb.investigations.filter((inv) => inv.id !== id && inv.caseId !== id && inv.case_id !== id);
+      writeLocalDb(memoryDb);
+    }
+    return { success: true, id };
   },
 
   async updateInvestigation(id, updates) {

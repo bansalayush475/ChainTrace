@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Search, Users, Shield, User, Briefcase, Eye, Database, Download, CheckCircle2, Trash2, RefreshCw, Sparkles, ChevronRight } from 'lucide-react';
+import { Plus, Search, Users, Shield, User, Briefcase, Eye, Database, Download, CheckCircle2, Trash2, RefreshCw, Sparkles, ChevronRight, Layers } from 'lucide-react';
 import DataTable from '../components/ui/DataTable';
 import StatusBadge from '../components/ui/StatusBadge';
 import NewInvestigationModal from '../components/ui/NewInvestigationModal';
@@ -499,10 +499,10 @@ export default function InvestigationsPage() {
             <Database size={26} />
           </div>
           <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)' }}>
-            Forensic Database is Empty (0 Records)
+            Investigative Ledger is Empty (0 Active Cases)
           </h3>
           <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)', maxWidth: '520px', lineHeight: 1.6 }}>
-            All evaluation records have been deleted from the sovereign IndexedDB database. You have a completely clean slate ready for real-time cybercrime complaint intake.
+            The sovereign database currently contains no active case files. You can register a new formal cyber fraud case or intake complaints directly from the NCRP 1930 portal.
           </p>
           <div style={{ display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
             <motion.button
@@ -525,6 +525,26 @@ export default function InvestigationsPage() {
               }}
             >
               <Plus size={15} /> START NEW INVESTIGATION
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => navigate('/bulk-triage')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 20px',
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border)',
+                borderRadius: '6px',
+                color: 'var(--text-primary)',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <Layers size={15} /> INTAKE 1930 COMPLAINTS
             </motion.button>
           </div>
         </motion.div>

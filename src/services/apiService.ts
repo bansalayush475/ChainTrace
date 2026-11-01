@@ -171,6 +171,12 @@ class ApiService {
     });
   }
 
+  async deleteInvestigation(id: string): Promise<{ success: boolean; id: string }> {
+    return this.request<{ success: boolean; id: string }>(`/investigations/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
   // Timeline
   async getTimeline(investigationId: string): Promise<TimelineEvent[]> {
     return this.request<TimelineEvent[]>(`/investigations/${investigationId}/timeline`);

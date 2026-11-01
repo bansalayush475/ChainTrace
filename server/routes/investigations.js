@@ -88,6 +88,23 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
+// DELETE /api/investigations/:id
+router.delete('/:id', async (req, res) => {
+  try {
+    const result = await db.deleteInvestigation(req.params.id);
+    await db.addAuditLog({
+      user: 'Lead Officer',
+      action: 'INVESTIGATION_DELETE',
+      resource: req.params.id,
+      ip: req.ip || '10.0.0.1',
+      details: `Purged investigation docket ${req.params.id} from judicial records`,
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete investigation', details: err.message });
+  }
+});
+
 // GET /api/investigations/:id/timeline
 router.get('/:id/timeline', async (req, res) => {
   try {

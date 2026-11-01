@@ -24,6 +24,7 @@ import {
   Zap,
   Landmark,
   Layers,
+  FolderOpen,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import KpiCard from '../components/ui/KpiCard';
@@ -633,14 +634,89 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div style={{ padding: '12px' }}>
-              <DataTable
-                columns={invColumns as Parameters<typeof DataTable>[0]['columns']}
-                data={displayedInvestigations.slice(0, 6) as unknown as Record<string, unknown>[]}
-                onRowClick={(row) => navigate(`/investigations/${(row as { id: string }).id}`)}
-                pagination={false}
-              />
-            </div>
+            {displayedInvestigations.length === 0 ? (
+              <div
+                style={{
+                  padding: '36px 20px',
+                  textAlign: 'center',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '12px',
+                }}
+              >
+                <div
+                  style={{
+                    width: '44px',
+                    height: '44px',
+                    borderRadius: '50%',
+                    background: 'rgba(66, 153, 225, 0.1)',
+                    border: '1px solid rgba(66, 153, 225, 0.25)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'var(--accent)',
+                  }}
+                >
+                  <FolderOpen size={22} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                    No Active Case Dossiers Registered
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', maxWidth: '440px', lineHeight: 1.5 }}>
+                    The investigative ledger is currently unpopulated. Initiate a formal cyber fraud investigation or intake complaints from the NCRP 1930 portal.
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                  <button
+                    onClick={() => setShowModal(true)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '7px 14px',
+                      background: 'var(--accent)',
+                      border: 'none',
+                      borderRadius: '6px',
+                      color: '#fff',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Plus size={14} /> Open New Investigation
+                  </button>
+                  <button
+                    onClick={() => navigate('/bulk-triage')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '7px 14px',
+                      background: 'var(--bg-elevated)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '6px',
+                      color: 'var(--text-primary)',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Layers size={14} /> Intake 1930 Complaints
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: '12px' }}>
+                <DataTable
+                  columns={invColumns as Parameters<typeof DataTable>[0]['columns']}
+                  data={displayedInvestigations.slice(0, 6) as unknown as Record<string, unknown>[]}
+                  onRowClick={(row) => navigate(`/investigations/${(row as { id: string }).id}`)}
+                  pagination={false}
+                />
+              </div>
+            )}
           </div>
 
           {/* Multi-Chain Fund Flow Topography (Transaction Graph) */}
