@@ -201,11 +201,17 @@ function computeGraphData(
     }
   } else if (walletAddress) {
     const targetAddr = walletAddress.toLowerCase();
-    displayTxs = allTxs.filter(
+    const matchingTxs = allTxs.filter(
       (t) =>
         t.fromAddress.toLowerCase() === targetAddr ||
         t.toAddress.toLowerCase() === targetAddr
     );
+    const maxHops = !hopDepth || hopDepth >= 14 ? matchingTxs.length : hopDepth;
+    displayTxs = matchingTxs.slice(0, maxHops);
+
+    const targetWalletObj = allWallets.find((w) => w.address.toLowerCase() === targetAddr);
+    const resolvedBlockchain = targetWalletObj?.blockchain || (walletAddress.startsWith('T') ? 'TRON' : walletAddress.startsWith('bc1') || walletAddress.startsWith('1') || walletAddress.startsWith('3') ? 'BTC' : 'ETH');
+
     const involvedAddresses = new Set<string>([targetAddr]);
     displayTxs.forEach((t) => {
       involvedAddresses.add(t.fromAddress.toLowerCase());
@@ -216,7 +222,7 @@ function computeGraphData(
       return (
         found || {
           address: addr,
-          blockchain: 'ETH',
+          blockchain: resolvedBlockchain as any,
           label: addr === targetAddr ? 'Target Wallet' : 'Counterparty',
           entityType: addr === targetAddr ? 'SUSPECT' : 'INTERMEDIATE',
           riskScore: 60,
@@ -727,6 +733,35 @@ export default function TransactionGraph({ investigationId, walletAddress, compa
                 <span>Inspect in Wallet Analysis</span>
                 <ExternalLink size={13} />
               </button>
+              <a
+                href={
+                  selectedNode.blockchain === 'TRON' || selectedNode.address.startsWith('T')
+                    ? `https://tronscan.org/#/address/${selectedNode.address}`
+                    : selectedNode.blockchain === 'BTC' || selectedNode.address.startsWith('bc1') || selectedNode.address.startsWith('1') || selectedNode.address.startsWith('3')
+                    ? `https://blockstream.info/address/${selectedNode.address}`
+                    : `https://etherscan.io/address/${selectedNode.address}`
+                }
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  width: '100%',
+                  padding: '7px',
+                  borderRadius: '6px',
+                  background: 'var(--bg-base)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-secondary)',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                }}
+              >
+                <span>View on {selectedNode.blockchain === 'TRON' || selectedNode.address.startsWith('T') ? 'TronScan' : 'Block Explorer'}</span>
+                <ExternalLink size={12} />
+              </a>
             </div>
           </div>
         )}

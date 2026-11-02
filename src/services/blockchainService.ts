@@ -113,37 +113,182 @@ export function getExplorerUrl(
 }
 
 /**
- * Fetch real TRON data (USDT TRC-20 and TRX balance) via TronGrid
+ * Fetch real TRON on-chain data (USDT TRC-20 transfers & TRX balance)
+ * Multi-source pipeline: TronScan OpenAPI (Primary) -> TronGrid Authenticated REST (Fallback)
  */
 export async function fetchTronWallet(address: string): Promise<LiveWalletData> {
   const timeoutPromise = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error('TronGrid API request timed out')), 8000)
+    setTimeout(() => reject(new Error('Tron on-chain query timed out')), 9000)
   );
 
+  const cleanAddr = address.trim();
+
+  // 1. PRIMARY: Query TronScan OpenAPI
   try {
-    // 1. Fetch TRC-20 transactions (Tether USDT is primary Indian cyber crime off-ramp)
-    const trc20Url = `https://api.trongrid.io/v1/accounts/${address}/transactions/trc20?limit=25`;
-    const accUrl = `https://api.trongrid.io/v1/accounts/${address}`;
+    const tronScanHeaders: Record<string, string> = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    };
+    const storedTronScanKey = typeof window !== 'undefined' ? localStorage.getItem('TRONSCAN_API_KEY') : null;
+    if (storedTronScanKey) {
+      tronScanHeaders['TRON-PRO-API-KEY'] = storedTronScanKey;
+    }
+
+    const trc20Url = `https://apilist.tronscanapi.com/api/token_trc20/transfers?limit=30&start=0&sort=-timestamp&count=true&relatedAddress=${cleanAddr}`;
+    const accUrl = `https://apilist.tronscanapi.com/api/account?address=${cleanAddr}`;
+    const txUrl = `https://apilist.tronscanapi.com/api/transaction?sort=-timestamp&count=true&limit=15&address=${cleanAddr}`;
+
+    const [trc20Res, accRes, txRes] = await Promise.race([
+      Promise.all([
+        fetch(trc20Url, { headers: tronScanHeaders }).then((r) => (r.ok ? r.json() : null)),
+        fetch(accUrl, { headers: tronScanHeaders }).then((r) => (r.ok ? r.json() : null)),
+        fetch(txUrl, { headers: tronScanHeaders }).then((r) => (r.ok ? r.json() : null)),
+      ]),
+      timeoutPromise,
+    ]);
+
+    if (accRes || (trc20Res && trc20Res.token_transfers)) {
+      const rawTransfers = trc20Res?.token_transfers || [];
+      const normalTxs = txRes?.data || [];
+
+      const trxBalance = ((accRes?.balance || 0) / 1e6);
+      let usdtBalance = 0;
+      if (Array.isArray(accRes?.trc20token_balances)) {
+        const u = accRes.trc20token_balances.find(
+          (t: any) => t.tokenId === 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t' || t.tokenAbbr === 'USDT'
+        );
+        if (u) usdtBalance = Number(u.balance) / Math.pow(10, u.tokenDecimal || 6);
+      }
+
+      const txs: LiveTransaction[] = [];
+      const counterparties = new Set<string>();
+      let totalReceived = 0;
+      let totalSent = 0;
+
+      // Process TRC-20 transfers (USDT / TRC-20 tokens)
+      rawTransfers.forEach((item: any) => {
+        const fromAddr = item.from_address || 'UNKNOWN';
+        const toAddr = item.to_address || 'UNKNOWN';
+        const isOut = fromAddr.toLowerCase() === cleanAddr.toLowerCase();
+        const rawVal = Number(item.quant || 0);
+        const decimals = item.tokenInfo?.tokenDecimal || 6;
+        const amount = rawVal / Math.pow(10, decimals);
+        const token = item.tokenInfo?.tokenAbbr || 'USDT';
+
+        if (isOut) {
+          totalSent += amount;
+          if (toAddr && toAddr !== 'UNKNOWN') counterparties.add(toAddr);
+        } else {
+          totalReceived += amount;
+          if (fromAddr && fromAddr !== 'UNKNOWN') counterparties.add(fromAddr);
+        }
+
+        const txRisk = calculateTransactionRiskScore({
+          amount,
+          usdValue: amount * (TOKEN_PRICES[token] || 1),
+          token,
+          type: isOut ? 'PEEL' : 'DEPOSIT',
+          direction: isOut ? 'OUTGOING' : 'INCOMING',
+          fromAddress: fromAddr,
+          toAddress: toAddr,
+          hash: item.transaction_id,
+          timestamp: item.block_ts ? new Date(item.block_ts).toISOString() : undefined,
+        });
+
+        txs.push({
+          hash: item.transaction_id,
+          from: fromAddr,
+          to: toAddr,
+          amount,
+          token,
+          usdValue: amount * (TOKEN_PRICES[token] || 1),
+          timestamp: item.block_ts ? new Date(item.block_ts).toISOString() : new Date().toISOString(),
+          type: isOut ? 'PEEL' : 'DEPOSIT',
+          riskScore: txRisk.riskScore,
+          explorerUrl: `https://tronscan.org/#/transaction/${item.transaction_id}`,
+          direction: isOut ? 'OUTGOING' : 'INCOMING',
+        });
+      });
+
+      // If no TRC-20 transfers found, parse normal TRX transfers
+      if (txs.length === 0 && normalTxs.length > 0) {
+        normalTxs.forEach((item: any) => {
+          const fromAddr = item.ownerAddress || 'UNKNOWN';
+          const toAddr = item.toAddress || 'UNKNOWN';
+          const isOut = fromAddr.toLowerCase() === cleanAddr.toLowerCase();
+          const amount = (item.amount || 0) / 1e6;
+
+          if (isOut) {
+            totalSent += amount;
+            if (toAddr && toAddr !== 'UNKNOWN') counterparties.add(toAddr);
+          } else {
+            totalReceived += amount;
+            if (fromAddr && fromAddr !== 'UNKNOWN') counterparties.add(fromAddr);
+          }
+
+          txs.push({
+            hash: item.hash,
+            from: fromAddr,
+            to: toAddr,
+            amount,
+            token: 'TRX',
+            usdValue: amount * (TOKEN_PRICES.TRX || 0.12),
+            timestamp: item.timestamp ? new Date(item.timestamp).toISOString() : new Date().toISOString(),
+            type: isOut ? 'TRANSFER' : 'DEPOSIT',
+            riskScore: 40,
+            explorerUrl: `https://tronscan.org/#/transaction/${item.hash}`,
+            direction: isOut ? 'OUTGOING' : 'INCOMING',
+          });
+        });
+      }
+
+      const finalBalance = usdtBalance > 0 ? usdtBalance : Math.max(0, totalReceived - totalSent) || trxBalance;
+      const firstSeen = txs.length > 0 ? txs[txs.length - 1].timestamp : new Date().toISOString();
+      const lastActivity = txs.length > 0 ? txs[0].timestamp : new Date().toISOString();
+
+      return {
+        address: cleanAddr,
+        blockchain: 'TRON',
+        balance: finalBalance,
+        token: usdtBalance > 0 || rawTransfers.length > 0 ? 'USDT' : 'TRX',
+        usdBalance: (usdtBalance > 0 ? usdtBalance : finalBalance) * (usdtBalance > 0 ? 1.0 : TOKEN_PRICES.TRX || 0.12),
+        totalReceived,
+        totalSent,
+        txCount: accRes?.totalTransactionCount || txs.length,
+        firstSeen,
+        lastActivity,
+        transactions: txs,
+        counterparties: counterparties.size,
+        riskScore: calculateDynamicRisk(txs, finalBalance, totalSent, 'USDT'),
+      };
+    }
+  } catch (err: any) {
+    console.warn(`[TronScan] Query fallback to TronGrid for ${cleanAddr}:`, err?.message || err);
+  }
+
+  // 2. FALLBACK: TronGrid Authenticated REST
+  try {
+    const tgKey = 'c6586d90-3773-4708-b334-3a3b3babc5e4';
+    const tgHeaders = { 'TRON-PRO-API-KEY': tgKey };
+    const trc20Url = `https://api.trongrid.io/v1/accounts/${cleanAddr}/transactions/trc20?limit=25`;
+    const accUrl = `https://api.trongrid.io/v1/accounts/${cleanAddr}`;
 
     const [trc20Res, accRes] = await Promise.race([
       Promise.all([
-        fetch(trc20Url).then((r) => (r.ok ? r.json() : { data: [] })),
-        fetch(accUrl).then((r) => (r.ok ? r.json() : { data: [] })),
+        fetch(trc20Url, { headers: tgHeaders }).then((r) => (r.ok ? r.json() : { data: [] })),
+        fetch(accUrl, { headers: tgHeaders }).then((r) => (r.ok ? r.json() : { data: [] })),
       ]),
       timeoutPromise,
     ]);
 
     const trc20Data: any[] = trc20Res.data || [];
     const accData = accRes.data?.[0] || {};
-
-    const trxBalance = (accData.balance || 0) / 1_000_000;
+    const trxBalance = (accData.balance || 0) / 1e6;
     let usdtBalance = 0;
 
-    // Check TRC-20 balance inside account record if available
     if (Array.isArray(accData.trc20)) {
       for (const token of accData.trc20) {
         if (token.TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t) {
-          usdtBalance = Number(token.TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t) / 1_000_000;
+          usdtBalance = Number(token.TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t) / 1e6;
         }
       }
     }
@@ -154,7 +299,7 @@ export async function fetchTronWallet(address: string): Promise<LiveWalletData> 
     let totalSent = 0;
 
     trc20Data.forEach((item: any) => {
-      const isOut = item.from?.toLowerCase() === address.toLowerCase();
+      const isOut = item.from?.toLowerCase() === cleanAddr.toLowerCase();
       const rawVal = Number(item.value || 0);
       const decimals = item.token_info?.decimals || 6;
       const amount = rawVal / Math.pow(10, decimals);
@@ -168,7 +313,6 @@ export async function fetchTronWallet(address: string): Promise<LiveWalletData> 
         if (item.from) counterparties.add(item.from);
       }
 
-      // Compute granular forensic risk score
       const txRisk = calculateTransactionRiskScore({
         amount,
         usdValue: amount * (TOKEN_PRICES[token] || 1),
@@ -188,9 +332,7 @@ export async function fetchTronWallet(address: string): Promise<LiveWalletData> 
         amount,
         token,
         usdValue: amount * (TOKEN_PRICES[token] || 1),
-        timestamp: item.block_timestamp
-          ? new Date(item.block_timestamp).toISOString()
-          : new Date().toISOString(),
+        timestamp: item.block_timestamp ? new Date(item.block_timestamp).toISOString() : new Date().toISOString(),
         type: isOut ? 'PEEL' : 'DEPOSIT',
         riskScore: txRisk.riskScore,
         explorerUrl: `https://tronscan.org/#/transaction/${item.transaction_id}`,
@@ -198,12 +340,12 @@ export async function fetchTronWallet(address: string): Promise<LiveWalletData> 
       });
     });
 
-    const finalBalance = usdtBalance > 0 ? usdtBalance : Math.max(0, totalReceived - totalSent);
+    const finalBalance = usdtBalance > 0 ? usdtBalance : Math.max(0, totalReceived - totalSent) || trxBalance;
     const firstSeen = txs.length > 0 ? txs[txs.length - 1].timestamp : new Date().toISOString();
     const lastActivity = txs.length > 0 ? txs[0].timestamp : new Date().toISOString();
 
     return {
-      address,
+      address: cleanAddr,
       blockchain: 'TRON',
       balance: finalBalance,
       token: 'USDT',
@@ -218,8 +360,8 @@ export async function fetchTronWallet(address: string): Promise<LiveWalletData> 
       riskScore: calculateDynamicRisk(txs, finalBalance, totalSent, 'USDT'),
     };
   } catch (err) {
-    console.warn(`TronGrid query fallback for ${address}:`, err);
-    return generateFallbackWallet(address, 'TRON');
+    console.warn(`[TronGrid] Fallback for ${cleanAddr}:`, err);
+    return generateFallbackWallet(cleanAddr, 'TRON');
   }
 }
 

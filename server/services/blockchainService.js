@@ -120,10 +120,60 @@ export async function queryPolygon(address) {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// TRON
+// TRON (TronScan OpenAPI with TronGrid Authenticated Fallback)
 // ──────────────────────────────────────────────────────────────────────────────
 
 export async function queryTron(address) {
+  const cleanAddr = address.trim();
+
+  // 1. Try TronScan API (Comprehensive on-chain TRC-20 & TRX data)
+  try {
+    const tronScanHeaders = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    };
+    if (process.env.TRONSCAN_API_KEY) {
+      tronScanHeaders['TRON-PRO-API-KEY'] = process.env.TRONSCAN_API_KEY;
+    }
+
+    const accRes = await fetchWithTimeout(
+      `https://apilist.tronscanapi.com/api/account?address=${cleanAddr}`,
+      { headers: tronScanHeaders },
+      6000
+    );
+
+    if (accRes.ok) {
+      const acc = await accRes.json();
+      const balanceTrx = (acc.balance || 0) / 1e6;
+      let usdtBalance = 0;
+
+      if (Array.isArray(acc.trc20token_balances)) {
+        const u = acc.trc20token_balances.find(
+          (t) => t.tokenId === USDT_TRC20_CONTRACT || t.tokenAbbr === 'USDT'
+        );
+        if (u) usdtBalance = Number(u.balance) / Math.pow(10, u.tokenDecimal || 6);
+      }
+
+      const txCount = acc.totalTransactionCount || 0;
+      return {
+        address: cleanAddr,
+        blockchain: 'TRON',
+        token: usdtBalance > 0 ? 'USDT (TRC-20)' : 'TRX',
+        balance: usdtBalance > 0 ? usdtBalance : balanceTrx,
+        balanceTrx,
+        usdtBalance,
+        txCount,
+        lastBlock: acc.latest_operation_time ? Math.floor(acc.latest_operation_time / 1000) : 0,
+        isLive: true,
+        provider: 'TronScan (Live On-Chain)',
+        providerUrl: 'https://apilist.tronscanapi.com',
+        timestamp: new Date().toISOString(),
+      };
+    }
+  } catch (err) {
+    console.warn(`[TronScan] Backend query fallback to TronGrid for ${cleanAddr}:`, err.message);
+  }
+
+  // 2. Fallback to TronGrid Authenticated API
   const headers = {
     'TRON-PRO-API-KEY': TRONGRID_API_KEY,
     'Content-Type': 'application/json',
@@ -131,8 +181,9 @@ export async function queryTron(address) {
 
   // Get account info
   const accountRes = await fetchWithTimeout(
-    `${TRON_API_URL}/v1/accounts/${address}`,
-    { headers }
+    `${TRON_API_URL}/v1/accounts/${cleanAddr}`,
+    { headers },
+    6000
   );
   if (!accountRes.ok) throw new Error(`TronGrid HTTP ${accountRes.status}`);
   const accountData = await accountRes.json();
@@ -154,8 +205,9 @@ export async function queryTron(address) {
   let txCount = 0;
   try {
     const txRes = await fetchWithTimeout(
-      `${TRON_API_URL}/v1/accounts/${address}/transactions?limit=1&only_confirmed=true`,
-      { headers }
+      `${TRON_API_URL}/v1/accounts/${cleanAddr}/transactions?limit=1&only_confirmed=true`,
+      { headers },
+      4000
     );
     if (txRes.ok) {
       const txData = await txRes.json();
@@ -166,7 +218,7 @@ export async function queryTron(address) {
   // Get latest block number
   let lastBlock = 0;
   try {
-    const blockRes = await fetchWithTimeout(`${TRON_API_URL}/walletsolidity/getnowblock`, { headers });
+    const blockRes = await fetchWithTimeout(`${TRON_API_URL}/walletsolidity/getnowblock`, { headers }, 4000);
     if (blockRes.ok) {
       const blockData = await blockRes.json();
       lastBlock = blockData?.block_header?.raw_data?.number || 0;
@@ -174,7 +226,7 @@ export async function queryTron(address) {
   } catch (_) { /* non-critical */ }
 
   return {
-    address,
+    address: cleanAddr,
     blockchain: 'TRON',
     token: usdtBalance > 0 ? 'USDT (TRC-20)' : 'TRX',
     balance: usdtBalance > 0 ? usdtBalance : balanceTrx,

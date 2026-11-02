@@ -207,7 +207,7 @@ export const investigations: Investigation[] = [
     id: "INV-001",
     caseId: "FIR-2024-DL-982314",
     title: "Digital Arrest & CBI Extortion Syndicate (Southeast Asia)",
-    suspectWallet: "TYDzsYUE3bmaipmxsioCGvPGMW5eN7Q6z3",
+    suspectWallet: "TU9bCFu6rdQxwLNAHVxJL81PaHskemrQE7",
     blockchain: "TRON",
     riskScore: 94,
     fundsTraced: 4850000,
@@ -275,7 +275,7 @@ export const investigations: Investigation[] = [
 
 export const wallets: Wallet[] = [
   {
-    address: "TYDzsYUE3bmaipmxsioCGvPGMW5eN7Q6z3",
+    address: "TU9bCFu6rdQxwLNAHVxJL81PaHskemrQE7",
     blockchain: "TRON",
     label: "Digital Arrest Syndicate Primary Collector",
     entityType: "SUSPECT",
@@ -590,7 +590,7 @@ export const alerts: Alert[] = [
     id: "ALT-1091",
     severity: "CRITICAL",
     type: "P2P_ESCROW_DISPATCH",
-    walletAddress: "TYDzsYUE3bmaipmxsioCGvPGMW5eN7Q6z3",
+    walletAddress: "TU9bCFu6rdQxwLNAHVxJL81PaHskemrQE7",
     message: "Golden Hour Alert: 54,500 USDT escrow release detected towards suspect wallet. Immediate §106 BNSS Freeze Notice required.",
     timestamp: new Date(Date.now() - 12 * 60000).toISOString(),
     dismissed: false,
@@ -712,7 +712,7 @@ export const auditLogs: AuditLog[] = [
     timestamp: new Date(Date.now() - 32 * 60000).toISOString(),
     user: "Officer (MHA-DEL-091)",
     action: "WALLET_LOOKUP",
-    resource: "TYDzsYUE3bmaipmxsioCGvPGMW5eN7Q6z3",
+    resource: "TU9bCFu6rdQxwLNAHVxJL81PaHskemrQE7",
     ip: "10.0.4.12",
     session: "SES-849201",
     details: "Initiated multi-hop peeling trace on TRON Mainnet via TronGrid indexer."
@@ -766,7 +766,7 @@ export const timelineEvents: TimelineEvent[] = [
     description: "Initial suspect wallet TYDzs...z3 received 54,500 USDT from P2P Escrow release.",
     txHash: "0x9e2b1f8d4c7a6e5b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b",
     amount: 54500,
-    walletAddress: "TYDzsYUE3bmaipmxsioCGvPGMW5eN7Q6z3",
+    walletAddress: "TU9bCFu6rdQxwLNAHVxJL81PaHskemrQE7",
     investigationId: "INV-001"
   },
   {
@@ -819,7 +819,7 @@ export const timelineEvents: TimelineEvent[] = [
 export const watchlistItems: WatchlistItem[] = [
   {
     id: "WTL-001",
-    target: "TYDzsYUE3bmaipmxsioCGvPGMW5eN7Q6z3",
+    target: "TU9bCFu6rdQxwLNAHVxJL81PaHskemrQE7",
     targetType: "WALLET",
     riskScore: 94,
     lastActivity: "2024-09-19T06:30:00Z",
@@ -869,7 +869,7 @@ export const walletClusters: WalletCluster[] = [
     exchangeExposure: 88,
     detectionReason: "Multi-input co-spending and rapid peeling cascade correlating with 8 NCRP 1930 dockets.",
     wallets: [
-      "TYDzsYUE3bmaipmxsioCGvPGMW5eN7Q6z3",
+      "TU9bCFu6rdQxwLNAHVxJL81PaHskemrQE7",
       "TGeR9vjM7Fm5n8sA3e19kLxWzP2q4cVbNt",
       "TKwM1k8Xj7v2Lq9p0Ns3dE5wA4mY7z6rTx",
       "TQn9Y2khEsLJW1ChVWFMSMeSTow5KaxUWF"

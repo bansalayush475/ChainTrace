@@ -8,7 +8,7 @@ const INITIAL_INVESTIGATIONS = [
     id: 'INV-001',
     caseId: 'CT-2024-0891',
     title: 'Operation Garuda: Southeast Asia Cyber Slavery & Digital Arrest Syndicate',
-    suspectWallet: 'TYDzsYUE3bmaipmxsioCGvPGMW5eN7Q6z3',
+    suspectWallet: 'TU9bCFu6rdQxwLNAHVxJL81PaHskemrQE7',
     blockchain: 'TRON',
     riskScore: 94,
     fundsTraced: 4850000.00,
@@ -93,7 +93,7 @@ const INITIAL_NCRP = [
     victimName: 'Rajeshwar Sharma',
     contactPhone: '+91 98112-40912',
     lossInr: 4850000,
-    suspectWallet: 'TYDzsYUE3bmaipmxsioCGvPGMW5eN7Q6z3',
+    suspectWallet: 'TU9bCFu6rdQxwLNAHVxJL81PaHskemrQE7',
     blockchain: 'TRON',
     bankUtr: 'SBIN982314981',
     upiVpa: 'manojverma.98@oksbi',
@@ -121,7 +121,7 @@ const INITIAL_NCRP = [
     victimName: 'Sunita Mehra',
     contactPhone: '+91 98334-11209',
     lossInr: 3200000,
-    suspectWallet: 'TYDzsYUE3bmaipmxsioCGvPGMW5eN7Q6z3',
+    suspectWallet: 'TU9bCFu6rdQxwLNAHVxJL81PaHskemrQE7',
     blockchain: 'TRON',
     bankUtr: 'ICIC310492711',
     upiVpa: 'sunita.m@okicici',
@@ -172,7 +172,7 @@ const INITIAL_NCRP = [
 
 const INITIAL_WALLETS = [
   {
-    address: 'TYDzsYUE3bmaipmxsioCGvPGMW5eN7Q6z3',
+    address: 'TU9bCFu6rdQxwLNAHVxJL81PaHskemrQE7',
     blockchain: 'TRON',
     label: 'Digital Arrest Primary Extortion Vault',
     entityType: 'SUSPECT',
@@ -288,7 +288,7 @@ const INITIAL_WALLETS = [
 const INITIAL_TRANSACTIONS = [
   {
     hash: '0x9e2b1f8d4c7a6e5b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b',
-    fromAddress: 'TYDzsYUE3bmaipmxsioCGvPGMW5eN7Q6z3',
+    fromAddress: 'TU9bCFu6rdQxwLNAHVxJL81PaHskemrQE7',
     toAddress: 'TGeR9vjM7Fm5n8sA3e19kLxWzP2q4cVbNt',
     amount: 54500,
     token: 'USDT',
@@ -364,7 +364,7 @@ const INITIAL_TIMELINE = [
     eventType: 'ALERT',
     description: '1930 NCRP Complaint 2024/NCRP/DL/982314 received. Complainant reported digital arrest extortion of ₹48.5 Lakhs.',
     amount: 4850000,
-    walletAddress: 'TYDzsYUE3bmaipmxsioCGvPGMW5eN7Q6z3',
+    walletAddress: 'TU9bCFu6rdQxwLNAHVxJL81PaHskemrQE7',
     investigatorNote: 'Golden Hour protocol initiated. Off-ramp velocity calculated at 0.87 USDT/sec.',
   },
   {

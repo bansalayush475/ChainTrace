@@ -131,7 +131,7 @@ const PRESETS: ScamPreset[] = [
     lossInr: 4850000,
     lossCrypto: '54,500 USDT',
     chain: 'TRON',
-    suspectWallet: 'TYDzsYUE3bmaipmxsioCGvPGMW5eN7Q6z3',
+    suspectWallet: 'TU9bCFu6rdQxwLNAHVxJL81PaHskemrQE7',
     targetExchange: 'Binance (FIU-IND Subpoena Compliant)',
     exchangeType: 'Centralized Exchange (CEX)',
     confidence: 96,
@@ -185,7 +185,7 @@ const PRESETS: ScamPreset[] = [
     interrogationPoints: [
       {
         category: 'Device Custody & Authorship',
-        question: 'Confirm whether the suspect holds exclusive cryptographic custody of private keys or seed phrases for address TYDzsYUE3bmaipmxsioCGvPGMW5eN7Q6z3.',
+        question: 'Confirm whether the suspect holds exclusive cryptographic custody of private keys or seed phrases for address TU9bCFu6rdQxwLNAHVxJL81PaHskemrQE7.',
         statutoryBasis: 'Section 43 & 66 IT Act, 2000',
         evidentiaryValue: 'Establishes direct individual mens rea and computer device control.',
       },
@@ -200,7 +200,7 @@ const PRESETS: ScamPreset[] = [
       {
         hop: 1,
         title: 'Victim P2P Escrow Release',
-        address: 'TYDzsYUE3bmaipmxsioCGvPGMW5eN7Q6z3',
+        address: 'TU9bCFu6rdQxwLNAHVxJL81PaHskemrQE7',
         txHash: '9e2b1f8d4c7a6e5b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b',
         amount: '54,500 USDT',
         riskScore: 68,

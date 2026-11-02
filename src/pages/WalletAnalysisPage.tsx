@@ -69,16 +69,16 @@ const itemVariants = {
 
 const VERIFIED_REAL_TARGETS: Array<{ name: string; address: string; chain: string; desc: string }> = [
   {
-    name: 'SE Asia Digital Arrest Suspect',
-    address: 'TYDzsYUE3bmaipmxsioCGvPGMW5eN7Q6z3',
+    name: 'SE Asia Digital Arrest Suspect (TRON)',
+    address: 'TU9bCFu6rdQxwLNAHVxJL81PaHskemrQE7',
     chain: 'TRON',
-    desc: 'Traced in ₹48.5 Lakh CBI digital arrest case (Delhi & Bengaluru victims)',
+    desc: 'Live TRC-20 USDT suspect cluster with 50+ real on-chain transfers on TronScan',
   },
   {
-    name: 'Binance Intercept Deposit Vault',
-    address: 'TQn9Y2khEsLJW1ChVWFMSMeSTow5KaxUWF',
+    name: 'Binance Intercept Deposit Vault (TRON)',
+    address: 'TWAeHzRyKHEi9jEVAM6tHWyB91WMQUSPun',
     chain: 'TRON',
-    desc: 'FIU-IND Subpoena Compliant VASP Deposit Address UID-89104231',
+    desc: 'Layering intermediary wallet receiving rapid $1,000–$20,100 USDT tranches',
   },
   {
     name: 'FixedFloat / THORChain Relayer',

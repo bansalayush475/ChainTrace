@@ -5,6 +5,8 @@ import path from 'path';
 const router = Router();
 
 const KNOWN_SUSPECTS = [
+  'tu9bcfu6rdqxwlnahvxjl81pahskemrqe7',
+  'twaehzrykhei9jevam6thwyb91wmquspun',
   'tydzsyue3bmaipmxsioargvpgmw5en7q6z3',
   'tqn9y2khesljw1chvwfmsmestow5kaxuwf',
   '0x71c839019284102948102948102948102a',
