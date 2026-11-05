@@ -307,17 +307,20 @@ export default function WalletAnalysisPage() {
   const riskFactors = getDefaultRiskFactors(effectiveRiskScore, wallet.address);
 
   // Evaluate Taint Profile
+  const incomingTaint = liveData?.totalReceived || wallet.totalReceived || 25000;
+  const cleanBal = Math.max(0.5, (liveData?.balance ?? wallet.balance) || incomingTaint * 0.45);
+
   const taintResult: ForensicTaintResult = calculateForensicTaint({
-    incomingTaintAmount: wallet.totalReceived || 50000,
-    cleanBalancePreTx: wallet.balance,
+    incomingTaintAmount: incomingTaint,
+    cleanBalancePreTx: cleanBal,
     hopDistance: wallet.entityType === 'SUSPECT' ? 1 : wallet.entityType === 'INTERMEDIATE' ? 2 : 3,
     model: taintModel,
-    sourceCategory: wallet.flags.some(f => f.toLowerCase().includes('sanction'))
+    sourceCategory: wallet.flags.some((f) => f.toLowerCase().includes('sanction'))
       ? 'SANCTIONED'
       : wallet.entityType === 'MIXER'
       ? 'MIXER'
       : 'STOLEN_FUNDS',
-    isSanctionedOrBlacklisted: wallet.flags.some(f => f.toLowerCase().includes('sanction')),
+    isSanctionedOrBlacklisted: wallet.flags.some((f) => f.toLowerCase().includes('sanction')),
   });
 
   const walletTxs = transactions.filter(
@@ -640,26 +643,33 @@ export default function WalletAnalysisPage() {
           </div>
 
           {/* Model Switcher */}
-          <div style={{ display: 'flex', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', padding: '3px' }}>
-            {(['HAIRCUT', 'FIFO', 'POISON'] as TaintModel[]).map((m) => (
-              <button
-                key={m}
-                onClick={() => setTaintModel(m)}
-                style={{
-                  padding: '5px 12px',
-                  borderRadius: '5px',
-                  border: 'none',
-                  background: taintModel === m ? 'var(--accent)' : 'transparent',
-                  color: taintModel === m ? '#fff' : 'var(--text-secondary)',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                }}
-              >
-                {m === 'HAIRCUT' ? 'Haircut (Proportional)' : m === 'FIFO' ? 'FIFO Model' : 'Poison (Zero-Tolerance)'}
-              </button>
-            ))}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+            <div style={{ display: 'flex', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', padding: '3px' }}>
+              {(['HAIRCUT', 'FIFO', 'POISON'] as TaintModel[]).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setTaintModel(m)}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: '5px',
+                    border: 'none',
+                    background: taintModel === m ? 'var(--accent)' : 'transparent',
+                    color: taintModel === m ? '#fff' : 'var(--text-secondary)',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {m === 'HAIRCUT' ? 'Haircut (Proportional)' : m === 'FIFO' ? 'FIFO Model' : 'Poison (Zero-Tolerance)'}
+                </button>
+              ))}
+            </div>
+            <span style={{ fontSize: '10px', color: 'var(--text-secondary)', fontFamily: 'JetBrains Mono, monospace' }}>
+              {taintModel === 'HAIRCUT' && 'Formula: Inflow / (Clean + Inflow) × Hop Decay (68%)'}
+              {taintModel === 'FIFO' && 'Formula: First-In First-Out Queue Priority with Retained Decay (78%)'}
+              {taintModel === 'POISON' && 'Formula: Strict Liability / Zero-Tolerance Contamination (88% Decay)'}
+            </span>
           </div>
         </div>
 

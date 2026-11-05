@@ -99,45 +99,47 @@ export function calculateForensicTaint(params: {
   const sourceCategory = params.sourceCategory || 'STOLEN_FUNDS';
   const hops = Math.max(1, params.hopDistance);
 
+  // Clean balance vs incoming tainted flow
+  const cleanBal = Math.max(0.01, params.cleanBalancePreTx);
+  const taintedInflow = Math.max(1, params.incomingTaintAmount);
+  const totalPool = cleanBal + taintedInflow;
+
   let taintScore = 0;
   let directTaint = 0;
   let indirectTaint = 0;
 
-  if (params.isSanctionedOrBlacklisted || sourceCategory === 'SANCTIONED') {
-    // Sanctions enforcement follows strict liability (Zero tolerance poison model)
-    taintScore = Math.max(88, 100 - (hops - 1) * 3);
-    directTaint = hops === 1 ? 100 : Math.max(0, 100 - (hops - 1) * 15);
-    indirectTaint = hops > 1 ? taintScore : 0;
-  } else {
-    switch (model) {
-      case 'POISON': {
-        // Any contamination triggers high taint, decaying slowly by hop
-        taintScore = Math.max(15, Math.round(100 * Math.pow(0.85, hops - 1)));
-        directTaint = hops === 1 ? 100 : 0;
-        indirectTaint = hops > 1 ? taintScore : 0;
-        break;
-      }
-      case 'FIFO': {
-        // Earliest tainted inflows are assumed to be spent first
-        const totalPool = Math.max(1, params.cleanBalancePreTx + params.incomingTaintAmount);
-        const inflowRatio = Math.min(1, params.incomingTaintAmount / totalPool);
-        const decay = Math.pow(0.80, hops - 1);
-        taintScore = Math.round(inflowRatio * 100 * decay);
-        directTaint = hops === 1 ? Math.round(inflowRatio * 100) : 0;
-        indirectTaint = hops > 1 ? taintScore : 0;
-        break;
-      }
-      case 'HAIRCUT':
-      default: {
-        // Proportional dilution model (industry standard for forensic accounting)
-        const totalPool = Math.max(0.0001, params.cleanBalancePreTx + params.incomingTaintAmount);
-        const proportionalRatio = params.incomingTaintAmount / totalPool;
-        const hopDecay = Math.pow(0.75, hops - 1);
-        taintScore = Math.min(100, Math.round(proportionalRatio * 100 * hopDecay));
-        directTaint = hops === 1 ? Math.round(proportionalRatio * 100) : 0;
-        indirectTaint = hops > 1 ? taintScore : 0;
-        break;
-      }
+  switch (model) {
+    case 'POISON': {
+      // Zero-Tolerance Strict Liability (OFAC / Sanctions Standard):
+      // Any contamination marks direct recipient at 100%, decaying slowly by hop
+      const hopDecay = Math.pow(0.88, hops - 1);
+      taintScore = Math.max(25, Math.round(100 * hopDecay));
+      directTaint = hops === 1 ? 100 : Math.round(100 * Math.pow(0.82, hops - 1));
+      indirectTaint = hops > 1 ? taintScore : 0;
+      break;
+    }
+    case 'FIFO': {
+      // First-In First-Out Accounting:
+      // Earliest tainted inflows are assumed to be spent first.
+      // Retained balance taint reflects sequential priority allocation.
+      const fifoPool = cleanBal * 0.4 + taintedInflow;
+      const inflowRatio = Math.min(1, taintedInflow / Math.max(1, fifoPool));
+      const hopDecay = Math.pow(0.78, hops - 1);
+      taintScore = Math.min(100, Math.max(12, Math.round(inflowRatio * 100 * hopDecay * 0.88)));
+      directTaint = hops === 1 ? Math.round(inflowRatio * 88) : 0;
+      indirectTaint = hops > 1 ? taintScore : 0;
+      break;
+    }
+    case 'HAIRCUT':
+    default: {
+      // Proportional Dilution Model (Industry Standard for Forensic Accounting):
+      // Taint = (Tainted Inflow) / (Clean Pre-Existing Balance + Tainted Inflow) × Hop Decay
+      const proportionalRatio = taintedInflow / totalPool;
+      const hopDecay = Math.pow(0.68, hops - 1);
+      taintScore = Math.min(100, Math.max(8, Math.round(proportionalRatio * 100 * hopDecay * 0.72)));
+      directTaint = hops === 1 ? Math.round(proportionalRatio * 72) : 0;
+      indirectTaint = hops > 1 ? taintScore : 0;
+      break;
     }
   }
 

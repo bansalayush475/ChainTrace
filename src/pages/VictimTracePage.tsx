@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Shield,
   Building2,
+  X,
   FileText,
   Copy,
   Printer,
@@ -2174,6 +2175,7 @@ Date: ${new Date().toLocaleDateString('en-GB')}
       {/* â”€â”€â”€ Statutory Section 91 CrPC VASP Notice Modal â”€â”€â”€ */}
       {showVaspFreezeModal && (
         <div
+          onClick={() => setShowVaspFreezeModal(false)}
           style={{
             position: 'fixed',
             inset: 0,
@@ -2184,9 +2186,11 @@ Date: ${new Date().toLocaleDateString('en-GB')}
             alignItems: 'center',
             justifyContent: 'center',
             padding: '16px',
+            cursor: 'pointer',
           }}
         >
           <div
+            onClick={(e) => e.stopPropagation()}
             style={{
               background: 'var(--bg-surface)',
               border: '1px solid var(--border)',
@@ -2219,17 +2223,19 @@ Date: ${new Date().toLocaleDateString('en-GB')}
               </div>
               <button
                 onClick={() => setShowVaspFreezeModal(false)}
+                title="Close (or click outside)"
                 style={{
                   background: 'none',
                   border: 'none',
                   color: 'var(--text-secondary)',
                   cursor: 'pointer',
-                  fontSize: '18px',
-                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   padding: '4px',
                 }}
               >
-                âœ•
+                <X size={18} />
               </button>
             </div>
 
@@ -2406,6 +2412,7 @@ Date: ${new Date().toLocaleDateString('en-GB')}
       {/* â”€â”€â”€ Statutory Section 102 CrPC Bank Account Freeze Modal â”€â”€â”€ */}
       {showBankFreezeModal && (
         <div
+          onClick={() => setShowBankFreezeModal(false)}
           style={{
             position: 'fixed',
             inset: 0,
@@ -2416,9 +2423,11 @@ Date: ${new Date().toLocaleDateString('en-GB')}
             alignItems: 'center',
             justifyContent: 'center',
             padding: '16px',
+            cursor: 'pointer',
           }}
         >
           <div
+            onClick={(e) => e.stopPropagation()}
             style={{
               background: 'var(--bg-surface)',
               border: '1px solid var(--border)',
@@ -2451,17 +2460,19 @@ Date: ${new Date().toLocaleDateString('en-GB')}
               </div>
               <button
                 onClick={() => setShowBankFreezeModal(false)}
+                title="Close (or click outside)"
                 style={{
                   background: 'none',
                   border: 'none',
                   color: 'var(--text-secondary)',
                   cursor: 'pointer',
-                  fontSize: '18px',
-                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   padding: '4px',
                 }}
               >
-                âœ•
+                <X size={18} />
               </button>
             </div>
 

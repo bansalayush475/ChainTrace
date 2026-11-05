@@ -89,68 +89,7 @@ export interface NewInvestigationInput {
   tags?: string[];
 }
 
-const INITIAL_REPORTS: GeneratedReport[] = [
-  {
-    id: "REP-2024-0982",
-    title: "FIR-2024-DL-982314 Judicial Evidence Dossier",
-    investigation: "Digital Arrest & CBI Extortion Syndicate (Southeast Asia)",
-    investigationId: "INV-001",
-    generatedAt: "2024-09-19T07:15:00.000Z",
-    pages: 14,
-    status: "FINAL",
-    sections: [
-      "Executive Summary & Incident Metadata",
-      "Victim Suspect Wallet Intelligence & Risk Score",
-      "Multi-Hop Fund-Flow Graph Traversal",
-      "Destination Exchange / VASP Attribution Analysis",
-      "Wallet Clusters & Co-Spending Heuristics",
-      "Fraud Pattern & Laundering Typology Match",
-      "Explainable AI (XAI) Deterministic Decision Tree",
-      "Investigation Timeline & Action Log",
-      "Evidence Requisition Record",
-      "Section 79A IT Act Electronic Evidence Certificate"
-    ],
-    notes: "Court-admissible electronic evidence certified under Section 63 of Bharatiya Sakshya Adhiniyam, 2023. Sealed with SHA-256 hash 0x7f81a9420b92da10482c1998ab81e912."
-  },
-  {
-    id: "REP-2024-0401",
-    title: "FIR-2024-MH-401928 Judicial Evidence Dossier",
-    investigation: "Pig Butchering Investment Scam & Tornado Cash Laundering",
-    investigationId: "INV-002",
-    generatedAt: "2024-09-18T20:30:00.000Z",
-    pages: 9,
-    status: "FINAL",
-    sections: [
-      "Executive Summary & Incident Metadata",
-      "Victim Suspect Wallet Intelligence & Risk Score",
-      "Multi-Hop Fund-Flow Graph Traversal",
-      "Destination Exchange / VASP Attribution Analysis",
-      "Fraud Pattern & Laundering Typology Match",
-      "Explainable AI (XAI) Deterministic Decision Tree",
-      "Section 79A IT Act Electronic Evidence Certificate"
-    ],
-    notes: "Mathematical correlation proving 93.2% temporal confidence across FixedFloat bridge and Tornado Cash pool."
-  },
-  {
-    id: "REP-2024-0718",
-    title: "FIR-2024-KA-718291 Judicial Evidence Dossier",
-    investigation: "Work-From-Home Telegram Task Ponzi & High-Velocity Mule Ring",
-    investigationId: "INV-003",
-    generatedAt: "2024-09-19T08:45:00.000Z",
-    pages: 11,
-    status: "FINAL",
-    sections: [
-      "Executive Summary & Incident Metadata",
-      "Victim Suspect Wallet Intelligence & Risk Score",
-      "Multi-Hop Fund-Flow Graph Traversal",
-      "Destination Exchange / VASP Attribution Analysis",
-      "Wallet Clusters & Co-Spending Heuristics",
-      "Explainable AI (XAI) Deterministic Decision Tree",
-      "Section 79A IT Act Electronic Evidence Certificate"
-    ],
-    notes: "Automated peel-chain analysis isolating 14 domestic mule accounts across Karnataka banking switches."
-  }
-];
+const INITIAL_REPORTS: GeneratedReport[] = [];
 
 interface StoreState {
   isAuthenticated: boolean;

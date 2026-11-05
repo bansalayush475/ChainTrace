@@ -65,6 +65,22 @@ export default function Topbar() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [setSearchOpen]);
 
+  // Close alert dropdown automatically when clicking on extra side screen or outside
+  useEffect(() => {
+    if (!showAlertDropdown) return;
+    function handleClickOutside(e: MouseEvent | TouchEvent) {
+      if (bellRef.current && !bellRef.current.contains(e.target as Node)) {
+        setShowAlertDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [showAlertDropdown]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
       {/* Product Info Strip */}

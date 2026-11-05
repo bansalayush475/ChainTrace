@@ -1215,28 +1215,40 @@ export const db = {
     if (!supabase) return false;
     try {
       const [invRes, walRes, txRes, evRes, tleRes] = await Promise.all([
-        supabase.from('investigations').select('*').order('created_at', { ascending: false }),
-        supabase.from('wallets').select('*').order('risk_score', { ascending: false }),
-        supabase.from('transactions').select('*').order('timestamp', { ascending: false }),
+        supabase
+          .from('investigations')
+          .select('*')
+          .not('tags', 'cs', '{"PURGED_DEMO"}')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('wallets')
+          .select('*')
+          .not('flags', 'cs', '{"PURGED_DEMO"}')
+          .order('risk_score', { ascending: false }),
+        supabase
+          .from('transactions')
+          .select('*')
+          .neq('type', 'PURGED_DEMO')
+          .order('timestamp', { ascending: false }),
         supabase.from('evidence_vault').select('*').order('created_at', { ascending: false }),
         supabase.from('timeline_events').select('*').order('created_at', { ascending: true }),
       ]);
 
-      if (Array.isArray(invRes.data) && !(memoryDb.meta && memoryDb.meta.clearedAt && memoryDb.investigations.length === 0)) {
-        memoryDb.investigations = invRes.data.map(fromSupabaseInvestigation);
-      }
-      if (Array.isArray(walRes.data)) {
-        memoryDb.wallets = walRes.data.map(fromSupabaseWallet);
-      }
-      if (Array.isArray(txRes.data)) {
-        memoryDb.transactions = txRes.data.map(fromSupabaseTransaction);
-      }
-      if (Array.isArray(evRes.data)) {
-        memoryDb.evidence = evRes.data.map(fromSupabaseEvidence);
-      }
-      if (Array.isArray(tleRes.data)) {
-        memoryDb.timeline_events = tleRes.data.map(fromSupabaseTimeline);
-      }
+      memoryDb.investigations = Array.isArray(invRes.data)
+        ? invRes.data.map(fromSupabaseInvestigation)
+        : [];
+      memoryDb.wallets = Array.isArray(walRes.data)
+        ? walRes.data.map(fromSupabaseWallet)
+        : [];
+      memoryDb.transactions = Array.isArray(txRes.data)
+        ? txRes.data.map(fromSupabaseTransaction)
+        : [];
+      memoryDb.evidence = Array.isArray(evRes.data)
+        ? evRes.data.filter((e) => memoryDb.investigations.some((i) => i.id === e.investigation_id)).map(fromSupabaseEvidence)
+        : [];
+      memoryDb.timeline_events = Array.isArray(tleRes.data)
+        ? tleRes.data.filter((t) => memoryDb.investigations.some((i) => i.id === t.investigation_id)).map(fromSupabaseTimeline)
+        : [];
       writeLocalDb(memoryDb);
       console.log(`[DB Engine] Synced with Supabase: ${memoryDb.investigations.length} investigations, ${memoryDb.wallets.length} wallets, ${memoryDb.transactions.length} txs.`);
       return true;
