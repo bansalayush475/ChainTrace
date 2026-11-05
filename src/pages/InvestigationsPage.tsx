@@ -50,15 +50,15 @@ export default function InvestigationsPage() {
   const [teamMemberFilter, setTeamMemberFilter] = useState('ALL');
   const [search, setSearch] = useState('');
 
-  // JUNIOR: Strictly isolated to Priya Patel's own assigned investigations
+  // JUNIOR: Strictly isolated to user's own assigned investigations
   // SENIOR: Sees the entire team's work across all investigators
-  const myNameLower = (user?.name || 'priya').toLowerCase();
+  const myNameLower = (user?.name || '').toLowerCase();
+  const myEmailLower = (user?.email || '').toLowerCase();
   const baseInvestigations = isJunior
-    ? investigations.filter(
-        (inv) =>
-          inv.investigator.toLowerCase().includes('priya') ||
-          inv.investigator.toLowerCase() === myNameLower
-      )
+    ? investigations.filter((inv) => {
+        const invName = (inv.investigator || '').toLowerCase();
+        return (myNameLower && invName.includes(myNameLower)) || (myEmailLower && invName.includes(myEmailLower));
+      })
     : investigations;
 
   const filtered = baseInvestigations.filter((inv) => {
@@ -70,53 +70,52 @@ export default function InvestigationsPage() {
     return true;
   });
 
-  // Team roster & what each team member is doing (for Senior Lead oversight)
-  const TEAM_ROSTER = [
-    {
-      name: 'Arjun Sharma',
-      role: 'Lead Crypto Forensic Analyst',
-      badge: 'LEAD · L4',
-      badgeColor: '#d69e2e',
-      currentTask: investigations.filter((i) => i.investigator.toLowerCase().includes('arjun')).length > 0
-        ? 'Supervising high-profile exchange theft and DeFi laundering flows'
-        : 'Standby · Ready for casework allocation',
-      activeCases: investigations.filter((i) => i.investigator.toLowerCase().includes('arjun')),
-      specialty: 'CEX Subpoenas & Mixer Unpeeling',
-    },
-    {
-      name: 'Priya Patel',
-      role: 'Junior Forensic Analyst',
-      badge: 'JUNIOR · L2',
-      badgeColor: '#38a169',
-      currentTask: investigations.filter((i) => i.investigator.toLowerCase().includes('priya')).length > 0
-        ? 'Tracing TRON USDT romance scam counterparties & bridge flows'
-        : 'Standby · Ready for casework allocation',
-      activeCases: investigations.filter((i) => i.investigator.toLowerCase().includes('priya')),
-      specialty: 'Field Tracing & Counterparty Profiling',
-    },
-    {
-      name: 'Rahul Verma',
-      role: 'Senior Intelligence Analyst',
-      badge: 'ANALYST · L3',
-      badgeColor: '#4299e1',
-      currentTask: investigations.filter((i) => i.investigator.toLowerCase().includes('rahul')).length > 0
-        ? 'Tracing ransomware peel chains across UTXO network'
-        : 'Standby · Ready for casework allocation',
-      activeCases: investigations.filter((i) => i.investigator.toLowerCase().includes('rahul')),
-      specialty: 'BTC Peel Chains & Ransomware Clusters',
-    },
-    {
-      name: 'Karan Mehta',
-      role: 'Smart Contract Forensic Specialist',
-      badge: 'SPECIALIST · L3',
-      badgeColor: '#9f7aea',
-      currentTask: investigations.filter((i) => i.investigator.toLowerCase().includes('karan')).length > 0
-        ? 'Decompiling cross-chain bridge duplicate validation exploits'
-        : 'Standby · Ready for casework allocation',
-      activeCases: investigations.filter((i) => i.investigator.toLowerCase().includes('karan')),
-      specialty: 'BNB / EVM Bridge Exploits',
-    },
-  ];
+  // Team roster dynamically computed from registered officer and active cases
+  const dynamicRoster = React.useMemo(() => {
+    const list: {
+      name: string;
+      role: string;
+      badge: string;
+      badgeColor: string;
+      currentTask: string;
+      activeCases: typeof investigations;
+      specialty: string;
+    }[] = [];
+    const seen = new Set<string>();
+
+    if (user?.name) {
+      seen.add(user.name.toLowerCase());
+      const myCases = investigations.filter((i) => (i.investigator || '').toLowerCase() === user.name.toLowerCase());
+      list.push({
+        name: user.name,
+        role: `${user.role || 'Forensic Investigator'} (You)`,
+        badge: user.roleType === 'SENIOR' ? 'LEAD · L4' : 'ANALYST · L2',
+        badgeColor: user.roleType === 'SENIOR' ? '#d69e2e' : '#38a169',
+        currentTask: myCases.length > 0 ? `Supervising and tracking ${myCases.length} assigned target docket(s)` : 'Standby · Ready for casework allocation',
+        activeCases: myCases,
+        specialty: 'On-Chain Forensics & Asset Recovery',
+      });
+    }
+
+    investigations.forEach((inv) => {
+      const invName = inv.investigator;
+      if (invName && !seen.has(invName.toLowerCase())) {
+        seen.add(invName.toLowerCase());
+        const officerCases = investigations.filter((i) => (i.investigator || '').toLowerCase() === invName.toLowerCase());
+        list.push({
+          name: invName,
+          role: 'Assigned Investigator',
+          badge: 'INVESTIGATOR',
+          badgeColor: '#4299e1',
+          currentTask: `Active casework on ${officerCases.length} suspect docket(s)`,
+          activeCases: officerCases,
+          specialty: 'Cross-Chain Analysis & Heuristics',
+        });
+      }
+    });
+
+    return list;
+  }, [investigations, user]);
 
   const columns = [
     { key: 'caseId', label: 'Case ID', render: (v: unknown) => <span style={{ fontFamily: 'JetBrains Mono, monospace', color: 'var(--text-mono)', fontSize: '12px' }}>{String(v)}</span>, sortable: true },
@@ -336,8 +335,8 @@ export default function InvestigationsPage() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
-            {TEAM_ROSTER.map((member) => {
-              const isSelected = teamMemberFilter.toLowerCase() === member.name.toLowerCase().split(' ')[0];
+            {dynamicRoster.map((member) => {
+              const isSelected = teamMemberFilter.toLowerCase() === member.name.toLowerCase();
               const totalFunds = member.activeCases.reduce((sum, c) => sum + (c.fundsTraced || 0), 0);
 
               return (
@@ -345,8 +344,7 @@ export default function InvestigationsPage() {
                   key={member.name}
                   whileHover={{ y: -3, transition: { duration: 0.15 } }}
                   onClick={() => {
-                    const firstName = member.name.split(' ')[0];
-                    setTeamMemberFilter(isSelected ? 'ALL' : firstName);
+                    setTeamMemberFilter(isSelected ? 'ALL' : member.name);
                   }}
                   className="cyber-card-interactive"
                   style={{
@@ -377,7 +375,7 @@ export default function InvestigationsPage() {
                           boxShadow: `0 0 8px ${member.badgeColor}33`,
                         }}
                       >
-                        {member.name.split(' ').map((n) => n[0]).join('')}
+                        {member.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
                       </div>
                       <div>
                         <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)' }}>{member.name}</div>
@@ -443,10 +441,11 @@ export default function InvestigationsPage() {
             style={{ padding: '7px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '12.5px', outline: 'none', cursor: 'pointer', fontWeight: 600 }}
           >
             <option value="ALL">👥 All Team Investigators ({investigations.length} Cases)</option>
-            <option value="Arjun">🛡️ Arjun Sharma — Lead ({investigations.filter((i) => i.investigator.toLowerCase().includes('arjun')).length} Cases)</option>
-            <option value="Priya">🔍 Priya Patel — Junior Analyst ({investigations.filter((i) => i.investigator.toLowerCase().includes('priya')).length} Cases)</option>
-            <option value="Rahul">📊 Rahul Verma — Senior Analyst ({investigations.filter((i) => i.investigator.toLowerCase().includes('rahul')).length} Cases)</option>
-            <option value="Karan">⚡ Karan Mehta — Bridge Specialist ({investigations.filter((i) => i.investigator.toLowerCase().includes('karan')).length} Cases)</option>
+            {dynamicRoster.map((member) => (
+              <option key={member.name} value={member.name}>
+                👤 {member.name} ({member.activeCases.length} Cases)
+              </option>
+            ))}
           </select>
         )}
 

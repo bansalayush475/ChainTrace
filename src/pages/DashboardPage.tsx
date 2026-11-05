@@ -33,18 +33,8 @@ import DataTable from '../components/ui/DataTable';
 import StatusBadge from '../components/ui/StatusBadge';
 import TransactionGraph from '../components/graph/TransactionGraph';
 import NewInvestigationModal from '../components/ui/NewInvestigationModal';
-import { fraudPatterns, exchangeAttributions, walletClusters } from '../data/mockData';
 import { useStore } from '../store/useStore';
 import { getRiskColor, formatUSD, truncateAddress } from '../utils/riskEngine';
-
-const LIVE_ALERT_MESSAGES = [
-  { severity: 'CRITICAL' as const, message: 'Mixer interaction detected: 0x7A82...A91F2 sent 45.2 ETH to Tornado Cash relay', type: 'MIXER_INTERACTION' },
-  { severity: 'HIGH' as const, message: 'Peel chain pattern detected across 12 hops originating from bc1q7x8m...k9d', type: 'PATTERN_DETECTED' },
-  { severity: 'MEDIUM' as const, message: 'Exchange deposit flagged: TQn9Y2...Dx4Pr deposited 180,000 USDT to Huobi', type: 'EXCHANGE_DEPOSIT' },
-  { severity: 'HIGH' as const, message: 'Dormant wallet activated: 0xA4B5...2B3 (dormant 847 days) moved 2.3 ETH', type: 'DORMANT_WALLET' },
-  { severity: 'CRITICAL' as const, message: 'Ransomware wallet identified: 98% confidence match with WannaCry payment cluster', type: 'RANSOMWARE' },
-  { severity: 'LOW' as const, message: 'New counterparty detected on watchlisted wallet 0xD1E2...D9E0', type: 'WATCHLIST_TRIGGER' },
-];
 
 const containerVariants: any = {
   hidden: { opacity: 0 },
@@ -77,24 +67,28 @@ export default function DashboardPage() {
   } = useStore();
 
   const isJunior = user?.roleType === 'JUNIOR';
-  const myNameLower = (user?.name || 'priya').toLowerCase();
+  const myNameLower = (user?.name || '').toLowerCase();
+  const myEmailLower = (user?.email || '').toLowerCase();
+
+  // Supervisory officer filter state (for Senior Lead view)
+  const [investigatorFilter, setInvestigatorFilter] = useState<string>('ALL');
 
   // In Junior mode, strictly isolate to their specific investigations
-  // In Senior mode, show everyone's work across the entire unit
+  // In Senior mode, show everyone's work across the entire unit, with optional filter
   const visibleInvestigations = isJunior
-    ? investigations.filter(
-        (inv) =>
-          inv.investigator.toLowerCase().includes('priya') ||
-          inv.investigator.toLowerCase() === myNameLower
-      )
-    : investigations;
+    ? investigations.filter((inv) => {
+        const invName = (inv.investigator || '').toLowerCase();
+        return (myNameLower && invName.includes(myNameLower)) || (myEmailLower && invName.includes(myEmailLower));
+      })
+    : investigatorFilter === 'ALL'
+    ? investigations
+    : investigations.filter((inv) => (inv.investigator || '').toLowerCase().includes(investigatorFilter.toLowerCase()));
 
   const [liveAlerts, setLiveAlerts] = useState(alerts.slice(0, 5));
   const [showModal, setShowModal] = useState(false);
 
   // Table filter state
   const [tableFilter, setTableFilter] = useState<'ALL' | 'HIGH_RISK' | 'ACTIVE'>('ALL');
-  const [investigatorFilter, setInvestigatorFilter] = useState<string>('ALL');
 
   // Junior Quick Tracer state
   const [quickTraceAddr, setQuickTraceAddr] = useState('');
@@ -110,10 +104,10 @@ export default function DashboardPage() {
     setLiveAlerts(alerts.slice(0, 5));
   }, [alerts]);
 
-  function handleSeniorApprove(id: string, title: string, actionType: string) {
+  function handleSeniorApprove(id: string, invId: string, title: string, actionType: string) {
     setApprovedItems((prev) => ({ ...prev, [id]: true }));
-    if (id === 'REV-01') {
-      updateInvestigationStatus('INV-002', 'ESCALATED');
+    if (invId) {
+      updateInvestigationStatus(invId, 'ESCALATED');
     }
     addAuditLog({
       user: user?.name || 'Senior Officer',
@@ -137,6 +131,42 @@ export default function DashboardPage() {
     if (tableFilter === 'ACTIVE') return inv.status === 'UNDER_INVESTIGATION' || inv.status === 'ANALYZING' || inv.status === 'ESCALATED';
     return true;
   });
+
+  const unitOfficers = React.useMemo(() => {
+    const list: { name: string; role: string; cases: string; color: string; caseId?: string }[] = [];
+    const seen = new Set<string>();
+
+    if (user?.name) {
+      seen.add(user.name.toLowerCase());
+      const myCases = investigations.filter((i) => (i.investigator || '').toLowerCase() === user.name.toLowerCase());
+      const myFunds = myCases.reduce((s, c) => s + (c.fundsTraced || 0), 0);
+      list.push({
+        name: user.name,
+        role: `${user.role || 'Supervisory Lead'} (You)`,
+        cases: `${myCases.length} case${myCases.length !== 1 ? 's' : ''} (${formatUSD(myFunds)})`,
+        color: '#d69e2e',
+        caseId: myCases[0]?.id,
+      });
+    }
+
+    investigations.forEach((inv) => {
+      const invName = inv.investigator;
+      if (invName && !seen.has(invName.toLowerCase())) {
+        seen.add(invName.toLowerCase());
+        const officerCases = investigations.filter((i) => (i.investigator || '').toLowerCase() === invName.toLowerCase());
+        const funds = officerCases.reduce((s, c) => s + (c.fundsTraced || 0), 0);
+        list.push({
+          name: invName,
+          role: 'Investigator',
+          cases: `${officerCases.length} case${officerCases.length !== 1 ? 's' : ''} (${formatUSD(funds)})`,
+          color: '#4299e1',
+          caseId: officerCases[0]?.id,
+        });
+      }
+    });
+
+    return list;
+  }, [investigations, user]);
 
   const invColumns = [
     {
@@ -189,7 +219,7 @@ export default function DashboardPage() {
       label: 'Investigator',
       render: (v: unknown) => {
         const name = String(v);
-        const isSelf = name.toLowerCase().includes('priya') && isJunior;
+        const isSelf = Boolean(myNameLower && name.toLowerCase().includes(myNameLower));
         return (
           <span style={{ fontSize: '11.5px', fontWeight: isSelf ? 700 : 500, color: isSelf ? '#38a169' : 'var(--text-secondary)' }}>
             {name} {isSelf && '(You)'}
@@ -433,84 +463,74 @@ export default function DashboardPage() {
               {
                 title: 'My Active Cases',
                 value: visibleInvestigations.length,
-                change: 1,
                 icon: <LayoutDashboard size={18} />,
                 variant: 'blue' as const,
-                sparklineData: [2, 3, 3, 4, 4, 5, 5],
+                subtitle: `${visibleInvestigations.filter(i => i.status === 'UNDER_INVESTIGATION' || i.status === 'ANALYZING').length} active, ${visibleInvestigations.filter(i => i.status === 'CLOSED').length} closed`,
               },
               {
                 title: 'Assigned Traced Volume',
                 value: formatUSD(totalFunds),
-                change: 14,
                 icon: <DollarSign size={18} />,
                 variant: 'safe' as const,
-                sparklineData: [1, 1.2, 1.4, 1.3, 1.5, 1.5, 1.54],
+                subtitle: `${visibleInvestigations.length} case docket(s)`,
               },
               {
                 title: 'Active Target Alerts',
                 value: alerts.filter((a) => !a.dismissed).length,
-                change: 15,
                 icon: <AlertTriangle size={18} />,
                 variant: 'critical' as const,
-                sparklineData: [2, 3, 5, 4, 7, 6, 8],
+                subtitle: `${alerts.filter(a => a.severity === 'CRITICAL').length} critical threats`,
               },
               {
                 title: 'Wallets Profiled',
                 value: wallets.length,
-                change: 8,
                 icon: <Wallet size={18} />,
                 variant: 'warning' as const,
-                sparklineData: [8, 10, 12, 11, 14, 13, 15],
+                subtitle: 'On-chain forensic targets',
               },
               {
                 title: 'Draft Exhibits',
                 value: evidence.length,
-                change: 4,
                 icon: <FileCheck size={18} />,
                 variant: 'safe' as const,
-                sparklineData: [3, 4, 4, 5, 5, 6, 6],
+                subtitle: 'Section 79A IT Act vault',
               },
             ]
           : [
               {
                 title: 'All Unit Cases',
                 value: investigations.filter((i) => i.status !== 'CLOSED').length,
-                change: 12,
                 icon: <LayoutDashboard size={18} />,
                 variant: 'blue' as const,
-                sparklineData: [3, 4, 5, 4, 6, 5, 6],
+                subtitle: `${investigations.length} total register`,
               },
               {
                 title: 'Total Unit Traced',
                 value: formatUSD(teamTotalFunds),
-                change: 8,
                 icon: <DollarSign size={18} />,
                 variant: 'safe' as const,
-                sparklineData: [3, 3.5, 4, 3.8, 4.2, 4.1, 4.5],
+                subtitle: 'Cumulative cross-chain',
               },
               {
                 title: 'Critical Anomalies',
                 value: alerts.filter((a) => a.severity === 'CRITICAL' && !a.dismissed).length,
-                change: 25,
                 icon: <AlertTriangle size={18} />,
                 variant: 'critical' as const,
-                sparklineData: [2, 3, 5, 4, 7, 6, 8],
+                subtitle: 'Active AML / mixer alerts',
               },
               {
-                title: 'Threat Clusters',
-                value: walletClusters.length,
-                change: 10,
+                title: 'Monitored Wallets',
+                value: wallets.length,
                 icon: <Building2 size={18} />,
                 variant: 'blue' as const,
-                sparklineData: [2, 3, 3, 4, 4, 5, 6],
+                subtitle: 'Surveillance register',
               },
               {
-                title: 'Supervisory Approvals',
-                value: 3,
-                change: 0,
+                title: 'Supervisory Review',
+                value: investigations.filter((i) => i.status === 'ANALYZING' || i.status === 'ESCALATED' || i.status === 'NEW').length,
                 icon: <Shield size={18} />,
                 variant: 'warning' as const,
-                sparklineData: [1, 2, 2, 3, 3, 3, 3],
+                subtitle: 'Pending docket actions',
               },
             ]
         ).map((kpi) => (
@@ -566,7 +586,7 @@ export default function DashboardPage() {
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                   {isJunior
-                    ? 'Restricted to Priya Patel caseload · Other unit dossiers shielded under Level-2 protocol'
+                    ? `Restricted to ${user?.name || 'Assigned Officer'} caseload · Other unit dossiers shielded under Level-2 protocol`
                     : 'Master register across all task force officers'}
                 </div>
               </div>
@@ -592,10 +612,9 @@ export default function DashboardPage() {
                     title="Supervisory Filter: Inspect specific officer's case docket"
                   >
                     <option value="ALL">All Officers (Unit-Wide Docket)</option>
-                    <option value="priya">Priya Patel (Junior Analyst · L2)</option>
-                    <option value="arjun">Arjun Sharma (Senior Lead · L4)</option>
-                    <option value="rohan">Rohan Mehra (Forensic Specialist)</option>
-                    <option value="neha">Neha Kapoor (Intel Analyst)</option>
+                    {Array.from(new Set(investigations.map((i) => i.investigator).filter(Boolean))).map((officer) => (
+                      <option key={officer} value={officer}>{officer}</option>
+                    ))}
                   </select>
                 )}
                 {(['ALL', 'HIGH_RISK', 'ACTIVE'] as const).map((filterKey) => (
@@ -806,24 +825,24 @@ export default function DashboardPage() {
                     <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', padding: '10px 12px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                         <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)', fontFamily: 'JetBrains Mono, monospace' }}>
-                          {visibleInvestigations[0]?.caseId || 'CT-2024-0892'}
+                          {visibleInvestigations[0]?.caseId}
                         </span>
-                        <StatusBadge status={approvedItems['REV-01'] ? 'ESCALATED' : (visibleInvestigations[0]?.status || 'ANALYZING')} size="sm" />
+                        <StatusBadge status={approvedItems[`REV-${visibleInvestigations[0]?.id}`] ? 'ESCALATED' : (visibleInvestigations[0]?.status || 'ANALYZING')} size="sm" />
                       </div>
                       <p style={{ margin: '0 0 8px', fontSize: '11.5px', color: 'var(--text-primary)', lineHeight: 1.4 }}>
-                        {visibleInvestigations[0]?.title || 'Suspect Tracking Docket'} — Submitted for task force review.
+                        {visibleInvestigations[0]?.title} — Submitted for task force review.
                       </p>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>
                           ₹{formatUSD(visibleInvestigations[0]?.fundsTraced || 0)}
                         </span>
-                        {approvedItems['REV-01'] ? (
+                        {approvedItems[`REV-${visibleInvestigations[0]?.id}`] ? (
                           <span style={{ color: '#38a169', fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '3px' }}>
                             <CheckCircle2 size={13} /> Approved
                           </span>
                         ) : (
                           <button
-                            onClick={() => handleSeniorApprove('REV-01', visibleInvestigations[0]?.caseId || 'CASE', 'Priority Escalation')}
+                            onClick={() => handleSeniorApprove(`REV-${visibleInvestigations[0]?.id}`, visibleInvestigations[0]?.id, visibleInvestigations[0]?.title, 'Priority Escalation')}
                             style={{ padding: '4px 10px', background: 'var(--accent)', border: 'none', borderRadius: '4px', color: '#fff', fontSize: '10.5px', fontWeight: 700, cursor: 'pointer' }}
                           >
                             Approve Escalation
@@ -982,63 +1001,68 @@ export default function DashboardPage() {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {[
-                  { name: 'Arjun Sharma', role: 'Lead (You)', cases: '2 cases ($7.00M)', color: '#d69e2e', caseId: 'INV-001' },
-                  { name: 'Priya Patel', role: 'Junior Analyst', cases: '2 cases ($1.54M)', color: '#38a169', caseId: 'INV-002' },
-                  { name: 'Rahul Verma', role: 'Senior Analyst', cases: '1 case ($1.50M)', color: '#4299e1', caseId: 'INV-003' },
-                  { name: 'Karan Mehta', role: 'Contract Specialist', cases: '1 case ($3.10M)', color: '#9f7aea', caseId: 'INV-006' },
-                ].map((officer) => (
-                  <div
-                    key={officer.name}
-                    style={{
-                      background: 'var(--bg-elevated)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '6px',
-                      padding: '8px 10px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div
-                        style={{
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '50%',
-                          background: `${officer.color}20`,
-                          border: `1px solid ${officer.color}`,
-                          color: officer.color,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '10px',
-                          fontWeight: 700,
-                        }}
-                      >
-                        {officer.name.split(' ').map((n) => n[0]).join('')}
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>{officer.name}</div>
-                        <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{officer.cases}</div>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => navigate(`/investigations/${officer.caseId}`)}
+                {unitOfficers.length === 0 ? (
+                  <div style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '12px' }}>
+                    <Users size={24} style={{ color: '#d69e2e', margin: '0 auto 6px', display: 'block', opacity: 0.8 }} />
+                    <span style={{ fontWeight: 600, display: 'block', color: 'var(--text-primary)', marginBottom: '3px' }}>No Unit Officers</span>
+                    New officers will appear here once authenticated.
+                  </div>
+                ) : (
+                  unitOfficers.map((officer) => (
+                    <div
+                      key={officer.name}
                       style={{
-                        padding: '4px 8px',
-                        background: 'transparent',
+                        background: 'var(--bg-elevated)',
                         border: '1px solid var(--border)',
-                        borderRadius: '4px',
-                        color: 'var(--text-secondary)',
-                        fontSize: '10px',
-                        cursor: 'pointer',
+                        borderRadius: '6px',
+                        padding: '8px 10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
                       }}
                     >
-                      Dossier →
-                    </button>
-                  </div>
-                ))}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div
+                          style={{
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '50%',
+                            background: `${officer.color}20`,
+                            border: `1px solid ${officer.color}`,
+                            color: officer.color,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '10px',
+                            fontWeight: 700,
+                          }}
+                        >
+                          {officer.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>{officer.name}</div>
+                          <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{officer.cases}</div>
+                        </div>
+                      </div>
+                      {officer.caseId && (
+                        <button
+                          onClick={() => navigate(`/investigations/${officer.caseId}`)}
+                          style={{
+                            padding: '4px 8px',
+                            background: 'transparent',
+                            border: '1px solid var(--border)',
+                            borderRadius: '4px',
+                            color: 'var(--text-secondary)',
+                            fontSize: '10px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Dossier →
+                        </button>
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           ) : (
@@ -1058,34 +1082,38 @@ export default function DashboardPage() {
                 </span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {[
-                  { name: 'Tornado Cash Relay #3', chain: 'ETH', risk: 99, address: '0x7A82...A91F2' },
-                  { name: 'Huobi Hot Deposit Cluster', chain: 'TRON', risk: 78, address: 'TQn9Y2...Dx4Pr' },
-                  { name: 'DefiYield Pool Exploit Sink', chain: 'ETH', risk: 92, address: '0x1A2B...3C4D' },
-                ].map((item) => (
-                  <div
-                    key={item.address}
-                    onClick={() => navigate(`/wallets/${item.address}`)}
-                    style={{
-                      background: 'var(--bg-elevated)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '6px',
-                      padding: '8px 10px',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-primary)' }}>{item.name}</div>
-                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)', fontFamily: 'JetBrains Mono, monospace' }}>{item.address} ({item.chain})</div>
-                    </div>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: getRiskColor(item.risk), fontFamily: 'JetBrains Mono, monospace' }}>
-                      {item.risk}
-                    </span>
+                {wallets.length === 0 ? (
+                  <div style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '12px' }}>
+                    <Target size={24} style={{ color: '#10b981', margin: '0 auto 6px', display: 'block', opacity: 0.8 }} />
+                    <span style={{ fontWeight: 600, display: 'block', color: 'var(--text-primary)', marginBottom: '3px' }}>No Monitored Entities</span>
+                    Target wallets added during investigation or triage will appear here.
                   </div>
-                ))}
+                ) : (
+                  wallets.slice(0, 4).map((item) => (
+                    <div
+                      key={item.address}
+                      onClick={() => navigate(`/wallets/${item.address}`)}
+                      style={{
+                        background: 'var(--bg-elevated)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '6px',
+                        padding: '8px 10px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-primary)' }}>{item.label || truncateAddress(item.address, 6)}</div>
+                        <div style={{ fontSize: '10px', color: 'var(--text-secondary)', fontFamily: 'JetBrains Mono, monospace' }}>{truncateAddress(item.address, 6)} ({item.blockchain})</div>
+                      </div>
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: getRiskColor(item.riskScore), fontFamily: 'JetBrains Mono, monospace' }}>
+                        {item.riskScore}
+                      </span>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           )}
@@ -1127,19 +1155,27 @@ export default function DashboardPage() {
               }}
               className="hide-scrollbar"
             >
-              <AnimatePresence>
-                {liveAlerts.map((alert) => (
-                  <motion.div
-                    key={alert.id}
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.25 }}
-                  >
-                    <AlertCard alert={alert} compact />
-                  </motion.div>
-                ))}
-              </AnimatePresence>
+              {liveAlerts.length === 0 ? (
+                <div style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '12px' }}>
+                  <CheckCircle2 size={24} style={{ color: '#10b981', margin: '0 auto 6px', display: 'block', opacity: 0.8 }} />
+                  <span style={{ fontWeight: 600, display: 'block', color: 'var(--text-primary)', marginBottom: '3px' }}>Network Nominal</span>
+                  No real-time anomalies or AML triggers detected across watched networks.
+                </div>
+              ) : (
+                <AnimatePresence>
+                  {liveAlerts.map((alert) => (
+                    <motion.div
+                      key={alert.id}
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.25 }}
+                    >
+                      <AlertCard alert={alert} compact />
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              )}
             </div>
           </div>
         </div>

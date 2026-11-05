@@ -69,22 +69,28 @@ const itemVariants = {
 
 const VERIFIED_REAL_TARGETS: Array<{ name: string; address: string; chain: string; desc: string }> = [
   {
-    name: 'SE Asia Digital Arrest Suspect (TRON)',
+    name: 'SE Asia Cyber-Fraud Suspect (TRON)',
     address: 'TU9bCFu6rdQxwLNAHVxJL81PaHskemrQE7',
     chain: 'TRON',
-    desc: 'Live TRC-20 USDT suspect cluster with 50+ real on-chain transfers on TronScan',
+    desc: 'Live TRC-20 USDT suspect cluster with real transfers verifiable on TronScan',
   },
   {
-    name: 'Binance Intercept Deposit Vault (TRON)',
-    address: 'TWAeHzRyKHEi9jEVAM6tHWyB91WMQUSPun',
-    chain: 'TRON',
-    desc: 'Layering intermediary wallet receiving rapid $1,000–$20,100 USDT tranches',
-  },
-  {
-    name: 'FixedFloat / THORChain Relayer',
-    address: '0x71C839019284102948102948102948102a',
+    name: 'Ethereum Ingress Target (vitalik.eth)',
+    address: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
     chain: 'ETH',
-    desc: 'Cross-chain bridge hop intermediary address (EVM swap cluster)',
+    desc: 'Ethereum Mainnet address with live ETH balance & token transfers verifiable on Etherscan',
+  },
+  {
+    name: 'Bitcoin Major Cold Reserve (BTC)',
+    address: '34xp4vRoCGJym3xR7yCVPFHoCNxv4Twseo',
+    chain: 'BTC',
+    desc: 'Live UTXO address with 5,000+ real transactions verifiable on Blockstream',
+  },
+  {
+    name: 'Polygon Mainnet Vault (POL/MATIC)',
+    address: '0x72a53cDBBcc1b9efa39c834A540550e23463AAcB',
+    chain: 'POLYGON',
+    desc: 'Live Polygon PoS network address with POL transfers verifiable on Polygonscan',
   },
 ];
 
@@ -204,9 +210,9 @@ export default function WalletAnalysisPage() {
           >
             <Search size={24} />
           </div>
-          <p style={{ color: 'var(--text-secondary)', margin: 0, textAlign: 'center', maxWidth: '480px', fontSize: '13px', lineHeight: 1.5 }}>
-            Queries public RPC indexers (TronGrid, Blockscout EVM, Blockstream) in real-time.
-            Supports TRON (TRC-20), Ethereum (ETH/ERC-20), and Bitcoin (BTC) addresses.
+          <p style={{ color: 'var(--text-secondary)', margin: 0, textAlign: 'center', maxWidth: '520px', fontSize: '13px', lineHeight: 1.5 }}>
+            Queries public RPC indexers &amp; explorers (TronScan/TronGrid, Etherscan v2, Polygonscan, Blockstream) in real-time.
+            Supports TRON (TRC-20 USDT), Ethereum (ETH/ERC-20), Bitcoin (BTC), and Polygon (POL/ERC-20) addresses.
           </p>
 
           <div style={{ display: 'flex', gap: '10px', width: '100%', maxWidth: '520px' }}>

@@ -70,7 +70,8 @@ const TOKEN_PRICES: Record<string, number> = {
 /**
  * Detect blockchain type from address format
  */
-export function detectBlockchain(address: string): BlockchainType {
+export function detectBlockchain(address: string, hint?: BlockchainType): BlockchainType {
+  if (hint && hint !== 'UNKNOWN') return hint;
   const clean = address.trim();
   if (clean.startsWith('T') && clean.length === 34) {
     return 'TRON';
@@ -103,6 +104,10 @@ export function getExplorerUrl(
       return type === 'tx'
         ? `https://etherscan.io/tx/${value}`
         : `https://etherscan.io/address/${value}`;
+    case 'POLYGON':
+      return type === 'tx'
+        ? `https://polygonscan.com/tx/${value}`
+        : `https://polygonscan.com/address/${value}`;
     case 'BTC':
       return type === 'tx'
         ? `https://blockstream.info/tx/${value}`
@@ -361,7 +366,7 @@ export async function fetchTronWallet(address: string): Promise<LiveWalletData> 
     };
   } catch (err) {
     console.warn(`[TronGrid] Fallback for ${cleanAddr}:`, err);
-    return generateFallbackWallet(cleanAddr, 'TRON');
+    return createEmptyWallet(cleanAddr, 'TRON', 'USDT');
   }
 }
 
@@ -484,7 +489,7 @@ export async function fetchEthereumWallet(address: string): Promise<LiveWalletDa
     };
   } catch (err) {
     console.warn(`Blockscout query fallback for ${address}:`, err);
-    return generateFallbackWallet(address, 'ETH');
+    return createEmptyWallet(address, 'ETH', 'ETH');
   }
 }
 
@@ -589,7 +594,132 @@ export async function fetchBitcoinWallet(address: string): Promise<LiveWalletDat
     };
   } catch (err) {
     console.warn(`Blockstream query fallback for ${address}:`, err);
-    return generateFallbackWallet(address, 'BTC');
+    return createEmptyWallet(address, 'BTC', 'BTC');
+  }
+}
+
+/**
+ * Fetch real Polygon data via Etherscan Unified v2 API (Polygonscan)
+ */
+export async function fetchPolygonWallet(address: string): Promise<LiveWalletData> {
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('Polygonscan API request timed out')), 8000)
+  );
+
+  try {
+    const ETHERSCAN_API_KEY = '1HMBTSA5MMTPPBD5AM1JEXHZV1U2NU4HW9';
+    const txUrl = `https://api.etherscan.io/v2/api?chainid=137&module=account&action=txlist&address=${address}&page=1&offset=25&sort=desc&apikey=${ETHERSCAN_API_KEY}`;
+    const balUrl = `https://api.etherscan.io/v2/api?chainid=137&module=account&action=balance&address=${address}&tag=latest&apikey=${ETHERSCAN_API_KEY}`;
+
+    const [txRes, balRes] = await Promise.race([
+      Promise.all([
+        fetch(txUrl).then((r) => (r.ok ? r.json() : { result: [] })),
+        fetch(balUrl).then((r) => (r.ok ? r.json() : { result: '0' })),
+      ]),
+      timeoutPromise,
+    ]);
+
+    const rawTxs: any[] = Array.isArray(txRes.result) ? txRes.result : [];
+    const rawBal = Number(balRes.result || '0');
+    const polBalance = rawBal / 1e18;
+
+    const txs: LiveTransaction[] = [];
+    const counterparties = new Set<string>();
+    let totalReceived = 0;
+    let totalSent = 0;
+
+    rawTxs.forEach((item: any) => {
+      const isOut = item.from?.toLowerCase() === address.toLowerCase();
+      let amount = Number(item.value || 0) / 1e18;
+      let token = 'POL';
+      let usdValue = amount * (TOKEN_PRICES.POL || 0.42);
+
+      // Extract ERC-20 transfer(address _to, uint256 _value) data if value is 0
+      if (item.input && item.input.startsWith('0xa9059cbb') && item.input.length >= 138) {
+        try {
+          const rawHexVal = item.input.slice(74, 138);
+          const rawBigInt = BigInt('0x' + rawHexVal);
+          const toContract = (item.to || '').toLowerCase();
+          const isUsdt = toContract === '0xc2132d05d31c914a87c6611c10748aeb04b58e8f';
+          const isUsdc =
+            toContract === '0x3c499c542cef5e3811e1192ce70d8cc03d5c3359' ||
+            toContract === '0x2791bca1f2de4661ed88a30c99a7a9449aa84174';
+
+          if (isUsdt) {
+            token = 'USDT';
+            amount = Number(rawBigInt) / 1e6;
+            usdValue = amount;
+          } else if (isUsdc) {
+            token = 'USDC';
+            amount = Number(rawBigInt) / 1e6;
+            usdValue = amount;
+          } else {
+            token = 'TOKEN';
+            amount = Number(rawBigInt) / 1e18;
+            usdValue = amount;
+          }
+        } catch {}
+      }
+
+      if (isOut) {
+        totalSent += amount;
+        if (item.to) counterparties.add(item.to);
+      } else {
+        totalReceived += amount;
+        if (item.from) counterparties.add(item.from);
+      }
+
+      const txRisk = calculateTransactionRiskScore({
+        amount,
+        usdValue,
+        token,
+        type: isOut ? 'PEEL' : 'TRANSFER',
+        direction: isOut ? 'OUTGOING' : 'INCOMING',
+        fromAddress: item.from,
+        toAddress: item.to,
+        hash: item.hash,
+        timestamp: item.timeStamp ? new Date(Number(item.timeStamp) * 1000).toISOString() : undefined,
+      });
+
+      txs.push({
+        hash: item.hash,
+        from: item.from,
+        to: item.to || 'Contract Creation',
+        amount,
+        token,
+        usdValue,
+        timestamp: item.timeStamp
+          ? new Date(Number(item.timeStamp) * 1000).toISOString()
+          : new Date().toISOString(),
+        blockNumber: Number(item.blockNumber || 0),
+        type: isOut ? 'PEEL' : 'TRANSFER',
+        riskScore: txRisk.riskScore,
+        explorerUrl: `https://polygonscan.com/tx/${item.hash}`,
+        direction: isOut ? 'OUTGOING' : 'INCOMING',
+      });
+    });
+
+    const firstSeen = txs.length > 0 ? txs[txs.length - 1].timestamp : new Date().toISOString();
+    const lastActivity = txs.length > 0 ? txs[0].timestamp : new Date().toISOString();
+
+    return {
+      address,
+      blockchain: 'POLYGON',
+      balance: polBalance,
+      token: 'POL',
+      usdBalance: polBalance * (TOKEN_PRICES.POL || 0.42),
+      totalReceived,
+      totalSent,
+      txCount: txs.length,
+      firstSeen,
+      lastActivity,
+      transactions: txs,
+      counterparties: counterparties.size,
+      riskScore: calculateDynamicRisk(txs, polBalance, totalSent, 'POL'),
+    };
+  } catch (err) {
+    console.warn(`Polygonscan query fallback for ${address}:`, err);
+    return createEmptyWallet(address, 'POLYGON', 'POL');
   }
 }
 
@@ -597,8 +727,11 @@ export async function fetchBitcoinWallet(address: string): Promise<LiveWalletDat
  * Universal entry point to fetch live wallet data for any chain.
  * Augments public unauthenticated data with authenticated backend RPC queries.
  */
-export async function fetchLiveWallet(address: string): Promise<LiveWalletData> {
-  const chain = detectBlockchain(address);
+export async function fetchLiveWallet(
+  address: string,
+  chainOverride?: BlockchainType
+): Promise<LiveWalletData> {
+  const chain = detectBlockchain(address, chainOverride);
   let walletData: LiveWalletData;
 
   switch (chain) {
@@ -608,11 +741,13 @@ export async function fetchLiveWallet(address: string): Promise<LiveWalletData> 
     case 'ETH':
       walletData = await fetchEthereumWallet(address);
       break;
+    case 'POLYGON':
+      walletData = await fetchPolygonWallet(address);
+      break;
     case 'BTC':
       walletData = await fetchBitcoinWallet(address);
       break;
     default:
-      // Default try EVM/ETH
       walletData = await fetchEthereumWallet(address);
       break;
   }
@@ -624,7 +759,7 @@ export async function fetchLiveWallet(address: string): Promise<LiveWalletData> 
       walletData.balance = apiData.balance;
       walletData.token = apiData.token || walletData.token;
       walletData.txCount = Math.max(walletData.txCount, apiData.txCount);
-      
+
       const usdPrice = TOKEN_PRICES[walletData.token.split(' ')[0]] || 1.0;
       walletData.usdBalance = walletData.balance * usdPrice;
     }
@@ -641,7 +776,8 @@ export async function fetchLiveWallet(address: string): Promise<LiveWalletData> 
  */
 export async function traceLivePeelChain(
   suspectAddress: string,
-  maxHops = 4
+  maxHops = 4,
+  chainHint?: BlockchainType
 ): Promise<{
   hops: PeelHop[];
   targetAddress: string;
@@ -649,27 +785,45 @@ export async function traceLivePeelChain(
   velocityMinutes: number;
   chain: BlockchainType;
 }> {
-  const chain = detectBlockchain(suspectAddress);
+  const chain = detectBlockchain(suspectAddress, chainHint);
   const hops: PeelHop[] = [];
 
   // Fetch initial ingress wallet data
-  const initialWallet = await fetchLiveWallet(suspectAddress);
+  const initialWallet = await fetchLiveWallet(suspectAddress, chain);
+
+  // If no transactions exist, return single entry with actual on-chain values
+  if (!initialWallet.transactions || initialWallet.transactions.length === 0) {
+    hops.push({
+      hop: 0,
+      title: 'Target Ingress Node',
+      address: suspectAddress,
+      txHash: 'No on-chain transactions recorded',
+      amount: `${initialWallet.balance.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${initialWallet.token}`,
+      riskScore: initialWallet.riskScore || 15,
+      flag: 'Target Wallet',
+      explorerUrl: getExplorerUrl('address', suspectAddress, chain),
+      timestamp: initialWallet.lastActivity !== 'Data unavailable' ? initialWallet.lastActivity : new Date().toISOString(),
+    });
+
+    return {
+      hops,
+      targetAddress: suspectAddress,
+      totalVolume: `${initialWallet.balance} ${initialWallet.token}`,
+      velocityMinutes: 0,
+      chain,
+    };
+  }
 
   // Hop 0: Victim Ingress / Suspect Entry
-  const initialTx = initialWallet.transactions[0] || {
-    hash: '0x' + Math.random().toString(16).slice(2, 42),
-    amount: initialWallet.balance || 24500,
-    token: initialWallet.token,
-    timestamp: new Date().toISOString(),
-  };
+  const initialTx = initialWallet.transactions[0];
 
   hops.push({
     hop: 0,
     title: 'Victim Ingress (Suspect Inflow)',
     address: suspectAddress,
     txHash: initialTx.hash,
-    amount: `${initialTx.amount.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${initialWallet.token}`,
-    riskScore: 95,
+    amount: `${initialTx.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${initialWallet.token}`,
+    riskScore: initialTx.riskScore || 85,
     flag: 'Victim Intake Point',
     explorerUrl: getExplorerUrl('tx', initialTx.hash, chain),
     timestamp: initialTx.timestamp,
@@ -691,12 +845,12 @@ export async function traceLivePeelChain(
       const isLastHop = hopIndex === Math.min(outgoingTxs.length, maxHops - 1);
       hops.push({
         hop: hopIndex,
-        title: isLastHop ? 'Consolidation / Deposit Gateway' : `Peel Chain Hop #${hopIndex}`,
+        title: isLastHop ? 'Consolidation / Counterparty Sweep' : `Peel Chain Hop #${hopIndex}`,
         address: tx.to,
         txHash: tx.hash,
-        amount: `${tx.amount.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${tx.token}`,
-        riskScore: Math.max(70, 94 - hopIndex * 5),
-        flag: isLastHop ? 'Consolidation Sweep' : 'Peel Layering Node',
+        amount: `${tx.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${tx.token}`,
+        riskScore: tx.riskScore || Math.max(60, 90 - hopIndex * 5),
+        flag: isLastHop ? 'Consolidation Sweep' : 'Peel Layering Counterparty',
         explorerUrl: getExplorerUrl('tx', tx.hash, chain),
         timestamp: tx.timestamp,
       });
@@ -707,34 +861,11 @@ export async function traceLivePeelChain(
     }
   }
 
-  // If outgoing hops were limited (<2 hops), synthesize on-chain deterministic peel trail
-  while (hops.length < 4) {
-    const prevHop = hops[hops.length - 1];
-    const prevAmountNum = parseFloat(prevHop.amount.replace(/[^0-9.]/g, '')) || 18500;
-    const peeledAmount = (prevAmountNum * 0.92).toFixed(2);
-    const hopAddr = generateRealisticDeterministicAddress(currentAddr, hops.length, chain);
-    const txHash = generateRealisticDeterministicTxHash(currentAddr, hops.length, chain);
-
-    const isFinal = hops.length === 3;
-    hops.push({
-      hop: hops.length,
-      title: isFinal ? 'Destination VASP Hot-Wallet Sweep' : `Peel Splitter Hop #${hops.length}`,
-      address: hopAddr,
-      txHash: txHash,
-      amount: `${Number(peeledAmount).toLocaleString()} ${initialWallet.token}`,
-      riskScore: isFinal ? 78 : Math.max(72, 90 - hops.length * 4),
-      flag: isFinal ? 'Exchange Deposit Hub' : 'Multi-Output Peel Node',
-      explorerUrl: getExplorerUrl('tx', txHash, chain),
-      timestamp: new Date(Date.now() - (4 - hops.length) * 18 * 60 * 1000).toISOString(),
-    });
-    currentAddr = hopAddr;
-  }
-
   return {
     hops,
     targetAddress: hops[hops.length - 1].address,
     totalVolume: hops[0].amount,
-    velocityMinutes: 78,
+    velocityMinutes: 45,
     chain,
   };
 }
@@ -788,113 +919,38 @@ function calculateDynamicRisk(
 }
 
 /**
- * Resilient deterministic address generation for mock/fallback hops
+ * Empty wallet representation when no data exists or fallback is needed
  */
-function generateRealisticDeterministicAddress(
-  seed: string,
-  hop: number,
-  chain: BlockchainType
-): string {
-  const hash = Math.abs(
-    seed.split('').reduce((acc, c) => (acc << 5) - acc + c.charCodeAt(0), 0) + hop * 9973
-  ).toString(16);
-
-  if (chain === 'TRON') {
-    return `TX${hash.slice(0, 6)}kL9qM${hash.slice(6, 12)}Fa${hop}0`;
-  }
-  if (chain === 'BTC') {
-    return `bc1q${hash.slice(0, 8)}7m88n${hash.slice(8, 14)}d8`;
-  }
-  return `0x${hash.padEnd(8, '7')}b99pLk${hash.slice(0, 6)}4dCeFa${hop.toString().padStart(2, '0')}`.slice(0, 42);
-}
-
-function generateRealisticDeterministicTxHash(
-  seed: string,
-  hop: number,
-  chain: BlockchainType
-): string {
-  const hash = Math.abs(
-    seed.split('').reduce((acc, c) => (acc << 3) - acc + c.charCodeAt(0), 0) + hop * 12345
-  ).toString(16);
-  return chain === 'TRON'
-    ? `${hash.padEnd(16, 'f')}${hash.slice(0, 16)}${hash.slice(0, 32)}`.slice(0, 64)
-    : `0x${hash.padEnd(20, 'a')}${hash.slice(0, 20)}${hash.slice(0, 24)}`.slice(0, 66);
-}
-
-/**
- * Graceful fallback wallet if public indexer is blocked or offline
- */
-function generateFallbackWallet(address: string, chain: BlockchainType): LiveWalletData {
-  const now = new Date();
-  const token = chain === 'TRON' ? 'USDT' : chain === 'ETH' ? 'ETH' : 'BTC';
-  const balance = chain === 'TRON' ? 24500 : chain === 'ETH' ? 4.82 : 0.385;
-
-  const tx1Hash = generateRealisticDeterministicTxHash(address, 1, chain);
-  const tx1From = generateRealisticDeterministicAddress(address, 9, chain);
-  const tx1Risk = calculateTransactionRiskScore({
-    amount: balance,
-    token,
-    type: 'TRANSFER',
-    direction: 'INCOMING',
-    fromAddress: tx1From,
-    toAddress: address,
-    hash: tx1Hash,
-  });
-
-  const tx2Hash = generateRealisticDeterministicTxHash(address, 2, chain);
-  const tx2To = generateRealisticDeterministicAddress(address, 2, chain);
-  const tx2Risk = calculateTransactionRiskScore({
-    amount: balance * 0.91,
-    token,
-    type: 'PEEL',
-    direction: 'OUTGOING',
-    fromAddress: address,
-    toAddress: tx2To,
-    hash: tx2Hash,
-  });
-
-  const txs: LiveTransaction[] = [
-    {
-      hash: tx1Hash,
-      from: tx1From,
-      to: address,
-      amount: balance,
-      token,
-      usdValue: balance * (TOKEN_PRICES[token] || 1),
-      timestamp: new Date(now.getTime() - 42 * 60 * 1000).toISOString(),
-      type: 'TRANSFER',
-      riskScore: tx1Risk.riskScore,
-      explorerUrl: getExplorerUrl('tx', tx1Hash, chain),
-      direction: 'INCOMING',
-    },
-    {
-      hash: tx2Hash,
-      from: address,
-      to: tx2To,
-      amount: balance * 0.91,
-      token,
-      usdValue: balance * 0.91 * (TOKEN_PRICES[token] || 1),
-      timestamp: new Date(now.getTime() - 15 * 60 * 1000).toISOString(),
-      type: 'PEEL',
-      riskScore: tx2Risk.riskScore,
-      explorerUrl: getExplorerUrl('tx', tx2Hash, chain),
-      direction: 'OUTGOING',
-    },
-  ];
+export function createEmptyWallet(
+  address: string,
+  chain: BlockchainType,
+  token?: string
+): LiveWalletData {
+  const defaultToken =
+    token ||
+    (chain === 'TRON'
+      ? 'TRX'
+      : chain === 'ETH'
+      ? 'ETH'
+      : chain === 'BTC'
+      ? 'BTC'
+      : chain === 'POLYGON'
+      ? 'POL'
+      : 'ETH');
 
   return {
     address,
     blockchain: chain,
-    balance,
-    token,
-    usdBalance: balance * (TOKEN_PRICES[token] || 1),
-    totalReceived: balance * 1.5,
-    totalSent: balance * 0.91,
-    txCount: 6,
-    firstSeen: new Date(now.getTime() - 86400000 * 4).toISOString(),
-    lastActivity: new Date(now.getTime() - 15 * 60 * 1000).toISOString(),
-    transactions: txs,
-    counterparties: 4,
-    riskScore: 88,
+    balance: 0,
+    token: defaultToken,
+    usdBalance: 0,
+    totalReceived: 0,
+    totalSent: 0,
+    txCount: 0,
+    firstSeen: 'Data unavailable',
+    lastActivity: 'Data unavailable',
+    transactions: [],
+    counterparties: 0,
+    riskScore: 0,
   };
 }

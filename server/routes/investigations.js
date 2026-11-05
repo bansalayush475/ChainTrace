@@ -35,7 +35,7 @@ router.post('/', async (req, res) => {
 
     // Audit log entry
     await db.addAuditLog({
-      user: created.investigator || 'Arjun Sharma',
+      user: created.investigator || body.officerName || 'Authorized Officer',
       action: 'INVESTIGATION_CREATE',
       resource: created.caseId,
       ip: req.ip || '10.0.0.1',

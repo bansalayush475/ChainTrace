@@ -379,7 +379,20 @@ export const useStore = create<StoreState>((set, get) => ({
         localStorage.removeItem('cbfis_active_session');
       }
     } catch {}
-    set({ isAuthenticated: false, user: null });
+    set({
+      isAuthenticated: false,
+      user: null,
+      currentInvestigationId: null,
+      selectedWalletAddress: null,
+      investigations: [],
+      wallets: [],
+      transactions: [],
+      timelineEvents: [],
+      evidence: [],
+      auditLogs: [],
+      alerts: [],
+      watchlist: [],
+    });
   },
 
   setCurrentInvestigation: (id) => set({ currentInvestigationId: id }),

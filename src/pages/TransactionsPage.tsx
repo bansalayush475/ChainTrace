@@ -4,7 +4,6 @@ import { motion } from 'framer-motion';
 import { ArrowLeftRight, ShieldAlert, Zap, Filter, Search, X } from 'lucide-react';
 import { useStore, Transaction } from '../store/useStore';
 import { truncateAddress, getRiskColor, formatUSD } from '../utils/riskEngine';
-import { transactions as mockTransactions } from '../data/mockData';
 import TransactionDetailsModal from '../components/ui/TransactionDetailsModal';
 
 const containerVariants = {

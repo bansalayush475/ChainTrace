@@ -43,9 +43,9 @@ export default function NewInvestigationModal({
     suspectWallet: initialWallet,
     blockchain: initialBlockchain,
     priority: initialPriority,
-    fundsTraced: '1450000',
+    fundsTraced: '',
     description: '',
-    tags: 'ncrp-intake, cyber-fraud, freeze-ready',
+    tags: 'ncrp-intake, cyber-fraud',
   });
 
   const [error, setError] = useState('');
@@ -72,7 +72,7 @@ export default function NewInvestigationModal({
       return;
     }
 
-    const funds = parseFloat(form.fundsTraced.replace(/[^0-9.]/g, '')) || 500000;
+    const funds = parseFloat(form.fundsTraced.replace(/[^0-9.]/g, '')) || 0;
     const tagArray = form.tags
       .split(',')
       .map((t) => t.trim().toLowerCase())
@@ -86,13 +86,20 @@ export default function NewInvestigationModal({
       blockchain: form.blockchain as 'ETH' | 'BTC' | 'TRON' | 'POLYGON' | 'BNB',
       priority: form.priority as 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW',
       fundsTraced: funds,
-      currency: form.blockchain === 'TRON' ? 'USDT' : form.blockchain === 'BTC' ? 'BTC' : 'ETH',
+      currency:
+        form.blockchain === 'TRON'
+          ? 'USDT'
+          : form.blockchain === 'BTC'
+          ? 'BTC'
+          : form.blockchain === 'POLYGON'
+          ? 'POL'
+          : 'ETH',
       description: form.description,
       tags: tagArray.length > 0 ? tagArray : undefined,
     });
 
     if (form.suspectWallet && form.suspectWallet.trim()) {
-      fetchLiveWallet(form.suspectWallet.trim())
+      fetchLiveWallet(form.suspectWallet.trim(), form.blockchain as any)
         .then((walletData) => {
           syncLiveWalletTransactions(walletData, newInv.id);
         })

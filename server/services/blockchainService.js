@@ -95,28 +95,67 @@ export async function queryEthereum(address) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 export async function queryPolygon(address) {
-  const balanceHex = await evmRpcCall(POLYGON_RPC_URL, 'eth_getBalance', [address, 'latest']);
-  const txCountHex = await evmRpcCall(POLYGON_RPC_URL, 'eth_getTransactionCount', [address, 'latest']);
-  const blockHex = await evmRpcCall(POLYGON_RPC_URL, 'eth_blockNumber', []);
+  try {
+    const balanceHex = await evmRpcCall(POLYGON_RPC_URL, 'eth_getBalance', [address, 'latest']);
+    const txCountHex = await evmRpcCall(POLYGON_RPC_URL, 'eth_getTransactionCount', [address, 'latest']);
+    const blockHex = await evmRpcCall(POLYGON_RPC_URL, 'eth_blockNumber', []);
 
-  const balanceWei = hexToDecimal(balanceHex);
-  const maticBalance = weiToEth(balanceWei);
-  const txCount = hexToDecimal(txCountHex);
-  const blockNumber = hexToDecimal(blockHex);
+    const balanceWei = hexToDecimal(balanceHex);
+    const maticBalance = weiToEth(balanceWei);
+    const txCount = hexToDecimal(txCountHex);
+    const blockNumber = hexToDecimal(blockHex);
 
-  return {
-    address,
-    blockchain: 'POLYGON',
-    token: 'MATIC',
-    balance: maticBalance,
-    balanceRaw: balanceWei,
-    txCount,
-    lastBlock: blockNumber,
-    isLive: true,
-    provider: 'GetBlock Polygon Mainnet',
-    providerUrl: 'shared.ap-southeast-1.getblock.io/***',
-    timestamp: new Date().toISOString(),
-  };
+    return {
+      address,
+      blockchain: 'POLYGON',
+      token: 'POL',
+      balance: maticBalance,
+      balanceRaw: balanceWei,
+      txCount,
+      lastBlock: blockNumber,
+      isLive: true,
+      provider: 'GetBlock Polygon Mainnet',
+      providerUrl: 'shared.ap-southeast-1.getblock.io/***',
+      timestamp: new Date().toISOString(),
+    };
+  } catch (err) {
+    console.warn(`[GetBlock Polygon] Fallback to Etherscan v2 for ${address}:`, err.message);
+    const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || '1HMBTSA5MMTPPBD5AM1JEXHZV1U2NU4HW9';
+    const balRes = await fetchWithTimeout(
+      `https://api.etherscan.io/v2/api?chainid=137&module=account&action=balance&address=${address}&tag=latest&apikey=${ETHERSCAN_API_KEY}`,
+      {},
+      6000
+    );
+    const txRes = await fetchWithTimeout(
+      `https://api.etherscan.io/v2/api?chainid=137&module=account&action=txlist&address=${address}&page=1&offset=5&sort=desc&apikey=${ETHERSCAN_API_KEY}`,
+      {},
+      6000
+    );
+
+    let balVal = 0;
+    if (balRes.ok) {
+      const bData = await balRes.json();
+      balVal = Number(bData.result || 0) / 1e18;
+    }
+    let txCount = 0;
+    if (txRes.ok) {
+      const tData = await txRes.json();
+      if (Array.isArray(tData.result)) txCount = tData.result.length;
+    }
+    return {
+      address,
+      blockchain: 'POLYGON',
+      token: 'POL',
+      balance: balVal,
+      balanceRaw: balVal * 1e18,
+      txCount,
+      lastBlock: 0,
+      isLive: true,
+      provider: 'Polygonscan / Etherscan v2 API',
+      providerUrl: 'api.etherscan.io/v2/api?chainid=137',
+      timestamp: new Date().toISOString(),
+    };
+  }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

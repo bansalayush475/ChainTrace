@@ -44,28 +44,34 @@ const itemVariants = {
 
 const HOP_DEPTHS = ['3 Hops', '5 Hops', '10 Hops', 'Maximum'];
 
-// Active sample addresses for 1-click live testing
+// Active sample addresses across all 4 verified chains for 1-click live testing
 const SAMPLE_TARGETS = [
   {
     address: 'TU9bCFu6rdQxwLNAHVxJL81PaHskemrQE7',
-    label: 'TRON / USDT Suspect Target (50+ Real Transfers)',
-    chain: 'TRON',
+    label: 'TRON: USDT TRC-20 Target (Live Transfers)',
+    chain: 'TRON' as const,
   },
   {
-    address: 'TWAeHzRyKHEi9jEVAM6tHWyB91WMQUSPun',
-    label: 'TRON Layering Counterparty',
-    chain: 'TRON',
+    address: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
+    label: 'ETH: vitalik.eth (Live Ethereum & Tokens)',
+    chain: 'ETH' as const,
   },
   {
-    address: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
-    label: 'Tether TRC-20 Primary Ledger',
-    chain: 'TRON',
+    address: '34xp4vRoCGJym3xR7yCVPFHoCNxv4Twseo',
+    label: 'BTC: Binance Cold Storage (Live BTC)',
+    chain: 'BTC' as const,
+  },
+  {
+    address: '0x72a53cDBBcc1b9efa39c834A540550e23463AAcB',
+    label: 'POLYGON: Major Vault (Live POL & Transfers)',
+    chain: 'POLYGON' as const,
   },
 ];
 
 export default function FundFlowPage() {
   const [activeHop, setActiveHop] = useState(0);
   const [targetAddressInput, setTargetAddressInput] = useState('');
+  const [selectedChain, setSelectedChain] = useState<'AUTO' | 'TRON' | 'ETH' | 'BTC' | 'POLYGON'>('AUTO');
   const [activeTargetAddress, setActiveTargetAddress] = useState<string | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractionMsg, setExtractionMsg] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
@@ -114,39 +120,51 @@ export default function FundFlowPage() {
   ];
 
   // Live Extraction Handler
-  const handleExtractAddress = async (addrToExtract?: string) => {
+  const handleExtractAddress = async (addrToExtract?: string, chainOverride?: any) => {
     const raw = (addrToExtract || targetAddressInput).trim();
     if (!raw) {
       setExtractionMsg({ type: 'error', text: 'Please enter a valid wallet address.' });
       return;
     }
 
+    const finalChain = chainOverride || (selectedChain !== 'AUTO' ? selectedChain : undefined);
+    const detected = detectBlockchain(raw, finalChain);
+
     setIsExtracting(true);
     setExtractionMsg({
       type: 'info',
-      text: `Connecting to ${raw.startsWith('T') ? 'TronScan OpenAPI & TronGrid' : 'On-Chain RPC'}... Extracting live DAG transfers...`,
+      text: `Connecting to ${detected} live ledger... Extracting real on-chain transfers...`,
     });
 
     try {
-      const liveData = await fetchLiveWallet(raw);
+      const liveData = await fetchLiveWallet(raw, finalChain);
 
-      if (liveData && liveData.transactions) {
+      if (liveData && liveData.transactions && liveData.transactions.length > 0) {
         // Sync into unified forensic store
         syncLiveWalletTransactions(liveData);
         setActiveTargetAddress(raw);
         setTargetAddressInput(raw);
 
         const txCount = liveData.transactions.length;
-        const providerName = liveData.blockchain === 'TRON' ? 'TronScan OpenAPI & TronGrid' : 'On-Chain RPC Node';
+        const providerName =
+          liveData.blockchain === 'TRON'
+            ? 'TronScan OpenAPI & TronGrid'
+            : liveData.blockchain === 'BTC'
+            ? 'Blockstream Electrs'
+            : liveData.blockchain === 'POLYGON'
+            ? 'Polygonscan / Etherscan v2'
+            : 'Infura / Etherscan v2';
 
         setExtractionMsg({
           type: 'success',
-          text: `Extracted ${txCount} on-chain transfers via ${providerName} (${liveData.counterparties} counterparties mapped).`,
+          text: `Extracted ${txCount} live on-chain transfers on ${liveData.blockchain} via ${providerName} (${liveData.counterparties} counterparties mapped).`,
         });
       } else {
+        setActiveTargetAddress(raw);
+        setTargetAddressInput(raw);
         setExtractionMsg({
-          type: 'error',
-          text: 'No transaction data returned from on-chain explorer for this address.',
+          type: 'info',
+          text: `Query succeeded: Address holds ${liveData?.balance || 0} ${liveData?.token || detected}, but 0 outgoing/incoming transactions were recorded in the recent window.`,
         });
       }
     } catch (err: any) {
@@ -412,7 +430,10 @@ export default function FundFlowPage() {
           {SAMPLE_TARGETS.map((target) => (
             <button
               key={target.address}
-              onClick={() => handleExtractAddress(target.address)}
+              onClick={() => {
+                setSelectedChain(target.chain);
+                handleExtractAddress(target.address, target.chain);
+              }}
               disabled={isExtracting}
               style={{
                 background: activeTargetAddress === target.address ? 'rgba(37,99,235,0.15)' : 'var(--bg-elevated)',

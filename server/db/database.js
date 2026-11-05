@@ -116,7 +116,7 @@ function toSupabaseInvestigation(inv) {
     risk_score: Number(inv.riskScore ?? inv.risk_score ?? 50),
     funds_traced: Number(inv.fundsTraced ?? inv.funds_traced ?? 0),
     currency: inv.currency || 'INR',
-    investigator: inv.investigator || 'Arjun Sharma',
+    investigator: inv.investigator || 'Authorized Officer',
     status: inv.status || 'UNDER_INVESTIGATION',
     priority: inv.priority || 'HIGH',
     description: inv.description || '',
@@ -540,23 +540,27 @@ export const db = {
     const supabase = getSupabase();
     if (supabase) {
       try {
-        let query = supabase.from('investigations').select('*').order('created_at', { ascending: false });
+        let query = supabase.from('investigations').select('*').not('tags', 'cs', '{"PURGED_DEMO"}').order('created_at', { ascending: false });
         if (filter.status) query = query.eq('status', filter.status);
         const { data, error } = await query;
-        if (!error && data && data.length > 0) {
-          return data.map(fromSupabaseInvestigation);
+        if (!error && data) {
+          let active = data.filter(i => !(i.tags && i.tags.includes('PURGED_DEMO'))).map(fromSupabaseInvestigation);
+          if (filter.investigator) {
+            active = active.filter((inv) => (inv.investigator || '').toLowerCase().includes(filter.investigator.toLowerCase()));
+          }
+          return active;
         }
       } catch (err) {
         console.warn('[Supabase Warning] investigations query fallback:', err.message);
       }
     }
 
-    let items = memoryDb.investigations || [];
+    let items = (memoryDb.investigations || []).filter(i => !(i.tags && i.tags.includes('PURGED_DEMO')));
     if (filter.status) {
       items = items.filter((inv) => inv.status === filter.status);
     }
     if (filter.investigator) {
-      items = items.filter((inv) => inv.investigator.toLowerCase().includes(filter.investigator.toLowerCase()));
+      items = items.filter((inv) => (inv.investigator || '').toLowerCase().includes(filter.investigator.toLowerCase()));
     }
     return items;
   },
@@ -589,7 +593,7 @@ export const db = {
       fundsTraced: Number(inv.fundsTraced ?? inv.funds_traced ?? 0),
       funds_traced: Number(inv.fundsTraced ?? inv.funds_traced ?? 0),
       currency: inv.currency || 'INR',
-      investigator: inv.investigator || 'Arjun Sharma',
+      investigator: inv.investigator || 'Authorized Officer',
       status: inv.status || 'UNDER_INVESTIGATION',
       priority: inv.priority || 'HIGH',
       description: inv.description || '',
@@ -935,18 +939,18 @@ export const db = {
     const supabase = getSupabase();
     if (supabase) {
       try {
-        let query = supabase.from('wallets').select('*').order('risk_score', { ascending: false });
+        let query = supabase.from('wallets').select('*').not('flags', 'cs', '{"PURGED_DEMO"}').order('risk_score', { ascending: false });
         if (filter.blockchain) query = query.eq('blockchain', filter.blockchain);
         if (filter.entityType) query = query.eq('entity_type', filter.entityType);
         const { data, error } = await query;
-        if (!error && data && data.length > 0) {
-          return data.map(fromSupabaseWallet);
+        if (!error && data) {
+          return data.filter(w => !(w.flags && w.flags.includes('PURGED_DEMO'))).map(fromSupabaseWallet);
         }
       } catch (err) {
         console.warn('[Supabase Warning] wallets query fallback:', err.message);
       }
     }
-    return memoryDb.wallets || [];
+    return (memoryDb.wallets || []).filter(w => !(w.flags && w.flags.includes('PURGED_DEMO')));
   },
 
   async addWallet(wallet) {
