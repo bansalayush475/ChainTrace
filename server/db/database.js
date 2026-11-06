@@ -431,18 +431,21 @@ export const db = {
   async getUserByEmail(email) {
     if (!email) return null;
     const cleanEmail = email.toLowerCase().trim();
+    const memUser = (memoryDb.users || []).find((u) => u.email.toLowerCase() === cleanEmail);
+
     const supabase = getSupabase();
     if (supabase) {
       try {
         const { data, error } = await supabase.from('users').select('*').eq('email', cleanEmail).maybeSingle();
         if (!error && data) {
-          return fromSupabaseUser(data);
+          const supaUser = fromSupabaseUser(data);
+          return memUser ? { ...supaUser, ...memUser } : supaUser;
         }
       } catch (err) {
         console.warn('[Supabase Warning] getUserByEmail fallback:', err.message);
       }
     }
-    return (memoryDb.users || []).find((u) => u.email.toLowerCase() === cleanEmail) || DEFAULT_USERS.find((u) => u.email.toLowerCase() === cleanEmail) || null;
+    return memUser || DEFAULT_USERS.find((u) => u.email.toLowerCase() === cleanEmail) || null;
   },
 
   async createUser(user) {
@@ -616,17 +619,27 @@ export const db = {
     return items;
   },
 
+  async getInvestigation(id) {
+    return this.getInvestigationById(id);
+  },
+
   async getInvestigationById(id) {
+    const memInv = (memoryDb.investigations || []).find((inv) => inv.id === id || inv.caseId === id || inv.case_id === id);
+    if (!memInv) {
+      return null;
+    }
     const supabase = getSupabase();
     if (supabase) {
       try {
-        const { data, error } = await supabase.from('investigations').select('*').or(`id.eq.${id},case_id.eq.${id}`).maybeSingle();
-        if (!error && data) return fromSupabaseInvestigation(data);
+        const { data, error } = await supabase.from('investigations').select('*').eq('id', id).maybeSingle();
+        if (!error && data && (!data.tags || !data.tags.includes('PURGED_DEMO'))) {
+          return fromSupabaseInvestigation(data);
+        }
       } catch (err) {
         console.warn('[Supabase Warning] getInvestigationById fallback:', err.message);
       }
     }
-    return (memoryDb.investigations || []).find((inv) => inv.id === id || inv.caseId === id || inv.case_id === id) || null;
+    return memInv;
   },
 
   async createInvestigation(inv) {
@@ -680,7 +693,8 @@ export const db = {
     const supabase = getSupabase();
     if (supabase) {
       try {
-        await supabase.from('investigations').delete().or(`id.eq.${id},case_id.eq.${id}`);
+        await supabase.from('investigations').delete().eq('id', id);
+        await supabase.from('investigations').delete().eq('case_id', id);
       } catch (err) {
         console.warn('[Supabase Exception] deleteInvestigation:', err.message);
       }
