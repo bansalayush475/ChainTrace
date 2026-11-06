@@ -237,6 +237,56 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// PUT /api/auth/profile
+router.put('/profile', async (req, res) => {
+  try {
+    const { email, ...updates } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Officer email is required' });
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+    const updatedUser = await db.updateUserProfile(cleanEmail, updates);
+
+    if (!updatedUser) {
+      return res.status(404).json({ error: 'Officer account not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Officer profile updated successfully',
+      user: sanitizeUser(updatedUser),
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update profile', details: err.message });
+  }
+});
+
+// POST /api/auth/profile (alias for client environments that restrict PUT)
+router.post('/profile', async (req, res) => {
+  try {
+    const { email, ...updates } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Officer email is required' });
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+    const updatedUser = await db.updateUserProfile(cleanEmail, updates);
+
+    if (!updatedUser) {
+      return res.status(404).json({ error: 'Officer account not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Officer profile updated successfully',
+      user: sanitizeUser(updatedUser),
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update profile', details: err.message });
+  }
+});
+
 // POST /api/auth/change-password
 router.post('/change-password', async (req, res) => {
   try {

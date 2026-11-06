@@ -295,12 +295,24 @@ function fromSupabaseAudit(row) {
   };
 }
 
+function normalizeEntityType(val) {
+  if (!val) return 'UNKNOWN';
+  const u = String(val).toUpperCase();
+  if (['VICTIM', 'SUSPECT', 'INTERMEDIATE', 'MIXER', 'EXCHANGE', 'BRIDGE', 'UNKNOWN'].includes(u)) {
+    return u;
+  }
+  if (u.includes('MULE') || u.includes('SCAM') || u.includes('HACK') || u.includes('TARGET')) return 'SUSPECT';
+  if (u.includes('HOP') || u.includes('RELAY') || u.includes('PEEL')) return 'INTERMEDIATE';
+  if (u.includes('VASP') || u.includes('BINANCE') || u.includes('WOBY') || u.includes('COINDCX')) return 'EXCHANGE';
+  return 'UNKNOWN';
+}
+
 function toSupabaseWallet(w) {
   return {
     address: w.address,
     blockchain: w.blockchain || 'ETH',
     label: w.label || 'Unlabeled Wallet',
-    entity_type: w.entityType || w.entity_type || 'UNKNOWN',
+    entity_type: normalizeEntityType(w.entityType || w.entity_type),
     risk_score: Number(w.riskScore ?? w.risk_score ?? 50),
     balance: Number(w.balance ?? 0),
     total_received: Number(w.totalReceived ?? w.total_received ?? 0),
@@ -528,6 +540,45 @@ export const db = {
       }
     }
     return hash;
+  },
+
+  async updateUserProfile(email, updates) {
+    const cleanEmail = (email || '').toLowerCase().trim();
+    let updatedUser = null;
+
+    if (memoryDb.users) {
+      const idx = memoryDb.users.findIndex((u) => u.email.toLowerCase() === cleanEmail);
+      if (idx !== -1) {
+        memoryDb.users[idx] = {
+          ...memoryDb.users[idx],
+          ...updates,
+          updated_at: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        updatedUser = memoryDb.users[idx];
+        writeLocalDb(memoryDb);
+      }
+    }
+
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const payload = {};
+        if (updates.name) payload.name = updates.name;
+        if (updates.badgeNo || updates.badge_no) payload.badge_no = updates.badgeNo || updates.badge_no;
+        if (updates.team) payload.team = updates.team;
+        if (updates.role) payload.role = updates.role;
+        if (updates.phone) payload.phone = updates.phone;
+        if (updates.jurisdiction) payload.jurisdiction = updates.jurisdiction;
+        payload.updated_at = new Date().toISOString();
+
+        await supabase.from('users').update(payload).eq('email', cleanEmail);
+      } catch (err) {
+        console.warn('[Supabase Warning] updateUserProfile:', err.message);
+      }
+    }
+
+    return updatedUser;
   },
 
   // ==========================================
@@ -1234,12 +1285,24 @@ export const db = {
         supabase.from('timeline_events').select('*').order('created_at', { ascending: true }),
       ]);
 
-      memoryDb.investigations = Array.isArray(invRes.data)
+      const rawInvs = Array.isArray(invRes.data)
         ? invRes.data.map(fromSupabaseInvestigation)
         : [];
-      memoryDb.wallets = Array.isArray(walRes.data)
+      memoryDb.investigations = rawInvs.filter((i) => {
+        if (!i || !i.id) return false;
+        if (['INV-001', 'INV-002', 'INV-003', 'INV-005', 'INV-024'].includes(i.id)) return false;
+        const lowerTitle = String(i.title || '').toLowerCase().trim();
+        if (['nwdjxnkj', 'uhuhu', 'yuhgbuybuyb'].includes(lowerTitle)) return false;
+        return true;
+      });
+      const rawWallets = Array.isArray(walRes.data)
         ? walRes.data.map(fromSupabaseWallet)
         : [];
+      memoryDb.wallets = rawWallets.filter((w) => {
+        if (!w || !w.address) return false;
+        if (['uhhhoui', '0xkneco392089085cn3u'].includes(w.address)) return false;
+        return true;
+      });
       memoryDb.transactions = Array.isArray(txRes.data)
         ? txRes.data.map(fromSupabaseTransaction)
         : [];

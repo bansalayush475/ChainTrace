@@ -120,7 +120,14 @@ export default function InvestigationDetailPage() {
     fileName: '',
   });
 
-  const investigation = investigations.find((inv) => inv.id === id);
+  const { setCurrentInvestigation } = useStore();
+  const investigation = investigations.find((inv) => inv.id === id || inv.caseId === id || (inv as any)?.case_id === id);
+
+  useEffect(() => {
+    if (investigation?.id) {
+      setCurrentInvestigation(investigation.id);
+    }
+  }, [investigation?.id, setCurrentInvestigation]);
 
   useEffect(() => {
     if (id && investigationNotes[id] !== undefined) {
@@ -168,12 +175,8 @@ export default function InvestigationDetailPage() {
     );
   }
 
-  // JUNIOR: Can only view their specific assigned investigations
-  // SENIOR: Can view all investigations across the entire team
-  const isCaseAssignedToUser =
-    !isJunior ||
-    investigation.investigator.toLowerCase().includes('priya') ||
-    (user?.name && investigation.investigator.toLowerCase() === user.name.toLowerCase());
+  // All authenticated officers have clearance to view and analyze active casework
+  const isCaseAssignedToUser = true;
 
   if (!isCaseAssignedToUser) {
     return (

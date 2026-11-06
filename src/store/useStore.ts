@@ -349,16 +349,33 @@ export const useStore = create<StoreState>((set, get) => ({
       return { theme: next };
     }),
 
-  updateUser: (updates) =>
+  updateUser: (updates) => {
+    let newAvatar = updates.avatar;
+    if (updates.name && !updates.avatar) {
+      const parts = updates.name.trim().split(/\s+/);
+      newAvatar = ((parts[0]?.[0] || 'U') + (parts[1]?.[0] || parts[0]?.[1] || '')).toUpperCase();
+    }
+
+    const payload = {
+      ...updates,
+      ...(newAvatar ? { avatar: newAvatar } : {}),
+    };
+
     set((state) => {
-      const updated = state.user ? { ...state.user, ...updates } : null;
+      const updated = state.user ? { ...state.user, ...payload } : null;
       if (updated && typeof window !== 'undefined') {
         try {
           localStorage.setItem('cbfis_active_session', JSON.stringify(updated));
         } catch {}
       }
       return { user: updated };
-    }),
+    });
+
+    // Asynchronously synchronize profile name and fields with server/database
+    api.updateProfile(payload).catch((err) => {
+      console.warn('[Store] Background profile update sync failed:', err);
+    });
+  },
 
   addInvestigation: (input) => {
     const state = get();

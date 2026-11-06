@@ -50,11 +50,10 @@ export default function InvestigationsPage() {
   const [teamMemberFilter, setTeamMemberFilter] = useState('ALL');
   const [search, setSearch] = useState('');
 
-  // JUNIOR: Strictly isolated to user's own assigned investigations
-  // SENIOR: Sees the entire team's work across all investigators
+  const [scopeFilter, setScopeFilter] = useState<'ALL' | 'ASSIGNED'>('ALL');
   const myNameLower = (user?.name || '').toLowerCase();
   const myEmailLower = (user?.email || '').toLowerCase();
-  const baseInvestigations = isJunior
+  const baseInvestigations = scopeFilter === 'ASSIGNED'
     ? investigations.filter((inv) => {
         const invName = (inv.investigator || '').toLowerCase();
         return (myNameLower && invName.includes(myNameLower)) || (myEmailLower && invName.includes(myEmailLower));
@@ -210,11 +209,11 @@ export default function InvestigationsPage() {
           </span>
           {isSenior ? (
             <span style={{ background: 'rgba(214,158,46,0.12)', color: '#d69e2e', border: '1px solid rgba(214,158,46,0.35)', borderRadius: '6px', padding: '4px 10px', fontSize: '11px', fontWeight: 800, letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Shield size={13} /> LEVEL-4 COMMAND · ALL TEAM MEMBERS VISIBLE
+              <Shield size={13} /> LEVEL-4 COMMAND · MASTER ROSTER
             </span>
           ) : (
             <span style={{ background: 'rgba(56,161,105,0.12)', color: '#38a169', border: '1px solid rgba(56,161,105,0.35)', borderRadius: '6px', padding: '4px 10px', fontSize: '11px', fontWeight: 800, letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Shield size={13} /> LEVEL-2 COMPARTMENTALIZED · PRIYA PATEL ONLY
+              <Shield size={13} /> LEVEL-2 FORENSIC ANALYST · {(user?.name || 'OFFICER').toUpperCase()}
             </span>
           )}
         </div>
@@ -275,7 +274,7 @@ export default function InvestigationsPage() {
             <Shield size={20} style={{ color: '#38a169' }} />
           </div>
           <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-            <strong style={{ color: '#38a169' }}>Personal Case Queue (Priya Patel):</strong> Under Level-2 confidentiality protocols, your view is strictly limited to investigations assigned directly to you. Dossiers belonging to Senior Lead Arjun Sharma and other specialists are restricted.
+            <strong style={{ color: '#38a169' }}>Officer Case Queue ({user?.name || 'Authorized Officer'}):</strong> Active cyber forensic cases within your unit jurisdiction. Select any case file to review on-chain counterparty linkages, timeline events, and statutory evidence.
           </div>
         </motion.div>
       )}

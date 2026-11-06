@@ -20,8 +20,12 @@ import {
   Search,
   UploadCloud,
   Layers,
-  ArrowRight
+  ArrowRight,
+  Mail,
+  Send,
+  Loader2,
 } from 'lucide-react';
+import { api } from '../services/apiService';
 import { useStore } from '../store/useStore';
 import StatusBadge from '../components/ui/StatusBadge';
 import type { Evidence } from '../data/mockData';
@@ -88,6 +92,33 @@ export default function EvidencePage() {
     evidence?: Evidence;
     certificateText: string;
   }>({ isOpen: false, certificateText: '' });
+
+  const [bsaEmailSending, setBsaEmailSending] = useState(false);
+  const [bsaEmailResult, setBsaEmailResult] = useState<string | null>(null);
+
+  async function handleMailBsaCertificate() {
+    if (!bsaModalData.certificateText) return;
+    setBsaEmailSending(true);
+    setBsaEmailResult(null);
+
+    try {
+      const recipient = user?.email || 'court.cybercrime@nic.in';
+      const res = await api.dispatchDossierEmail({
+        toEmail: recipient,
+        toName: user?.name || 'Magistrate Court / IO',
+        subject: `[STATUTORY CERTIFICATE] Sec 63 BSA 2023 Electronic Evidence Seal (${bsaModalData.evidence?.id || 'EXHIBIT'})`,
+        docType: 'BSA_CERTIFICATE',
+        caseId: bsaModalData.evidence?.investigationId || 'CT-2024',
+        content: bsaModalData.certificateText,
+        officerName: user?.name || 'Investigating Officer',
+      });
+      setBsaEmailResult(`Dispatched to ${recipient} (Ref: ${res.dispatchRef || 'MHA/I4C'})`);
+    } catch (err: any) {
+      setBsaEmailResult(`Failed: ${err.message}`);
+    } finally {
+      setBsaEmailSending(false);
+    }
+  }
 
   const [freezeModalData, setFreezeModalData] = useState<{
     isOpen: boolean;
@@ -1191,10 +1222,39 @@ export default function EvidencePage() {
                   alignItems: 'center',
                 }}
               >
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                  Legally valid under Sec 63 BSA 2023 & Sec 79A IT Act for Indian Courts.
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                    Legally valid under Sec 63 BSA 2023 & Sec 79A IT Act for Indian Courts.
+                  </div>
+                  {bsaEmailResult && (
+                    <div style={{ fontSize: '11px', color: bsaEmailResult.startsWith('Failed') ? '#ef4444' : '#10b981', fontWeight: 600, marginTop: '2px' }}>
+                      {bsaEmailResult}
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={handleMailBsaCertificate}
+                    disabled={bsaEmailSending}
+                    style={{
+                      padding: '8px 16px',
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      border: 'none',
+                      borderRadius: '6px',
+                      color: '#fff',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: bsaEmailSending ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      boxShadow: '0 2px 8px rgba(16,185,129,0.3)',
+                    }}
+                  >
+                    {bsaEmailSending ? <Loader2 size={13} className="animate-spin" /> : <Mail size={13} />}
+                    Mail Certificate
+                  </button>
+
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(bsaModalData.certificateText);

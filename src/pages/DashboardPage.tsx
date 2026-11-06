@@ -56,6 +56,8 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const {
     investigations,
+    currentInvestigationId,
+    setCurrentInvestigation,
     alerts,
     wallets,
     transactions,
@@ -83,6 +85,9 @@ export default function DashboardPage() {
     : investigatorFilter === 'ALL'
     ? investigations
     : investigations.filter((inv) => (inv.investigator || '').toLowerCase().includes(investigatorFilter.toLowerCase()));
+
+  const availableTopographyCases = visibleInvestigations.length > 0 ? visibleInvestigations : investigations;
+  const activeTopographyCase = availableTopographyCases.find((i) => i.id === currentInvestigationId) || null;
 
   const [liveAlerts, setLiveAlerts] = useState(alerts.slice(0, 5));
   const [showModal, setShowModal] = useState(false);
@@ -754,35 +759,163 @@ export default function DashboardPage() {
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '10px',
               }}
             >
-              <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                 <span style={{ fontWeight: 700, fontSize: '13.5px', color: 'var(--text-primary)' }}>
                   Multi-Chain Fund Flow Topography
                 </span>
-                <span style={{ marginLeft: '8px', fontSize: '11px', color: 'var(--text-secondary)' }}>
-                  Interactive heuristics &amp; cluster linkages
-                </span>
+                {activeTopographyCase && (
+                  <span
+                    style={{
+                      background: 'rgba(56, 189, 248, 0.12)',
+                      color: 'var(--accent)',
+                      border: '1px solid rgba(56, 189, 248, 0.3)',
+                      borderRadius: '4px',
+                      padding: '2px 8px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    Active Docket: {activeTopographyCase.caseId}
+                  </span>
+                )}
               </div>
-              <button
-                onClick={() => navigate('/fund-flow')}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--accent)',
-                  fontSize: '11.5px',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                }}
-              >
-                Full Graph Explorer <ArrowRight size={12} />
-              </button>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {availableTopographyCases.length > 0 && (
+                  <select
+                    value={activeTopographyCase?.id || ''}
+                    onChange={(e) => setCurrentInvestigation(e.target.value || null)}
+                    style={{
+                      background: 'var(--bg-elevated)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '5px',
+                      color: 'var(--text-primary)',
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                      padding: '4px 8px',
+                      cursor: 'pointer',
+                      outline: 'none',
+                    }}
+                  >
+                    <option value="">-- Choose Case Docket --</option>
+                    {availableTopographyCases.map((inv) => (
+                      <option key={inv.id} value={inv.id}>
+                        {inv.caseId}: {inv.title.slice(0, 32)} ({inv.blockchain})
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                <button
+                  onClick={() => navigate('/fund-flow')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--accent)',
+                    fontSize: '11.5px',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  Full Graph Explorer <ArrowRight size={12} />
+                </button>
+              </div>
             </div>
+
             <div style={{ padding: '14px' }}>
-              <TransactionGraph compact height={350} />
+              {activeTopographyCase ? (
+                <TransactionGraph compact height={350} investigationId={activeTopographyCase.id} />
+              ) : (
+                <div
+                  style={{
+                    height: '260px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '12px',
+                    background: 'rgba(15, 23, 42, 0.3)',
+                    border: '1px dashed var(--border)',
+                    borderRadius: '8px',
+                    padding: '20px',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '42px',
+                      height: '42px',
+                      borderRadius: '50%',
+                      background: 'rgba(56, 189, 248, 0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'var(--accent)',
+                    }}
+                  >
+                    <GitBranch size={22} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '13.5px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                      Select an Active Case Docket to View Topography
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', maxWidth: '440px', lineHeight: 1.5 }}>
+                      To prevent displaying mixed multi-graph linkages across unrelated investigations, choose a specific case docket from the selector above or launch a new investigation.
+                    </div>
+                  </div>
+                  {availableTopographyCases.length > 0 ? (
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                      <select
+                        defaultValue=""
+                        onChange={(e) => {
+                          if (e.target.value) setCurrentInvestigation(e.target.value);
+                        }}
+                        style={{
+                          padding: '6px 12px',
+                          background: 'var(--bg-elevated)',
+                          border: '1px solid var(--accent)',
+                          borderRadius: '6px',
+                          color: 'var(--text-primary)',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          outline: 'none',
+                        }}
+                      >
+                        <option value="" disabled>-- Click Here to Select Case Docket --</option>
+                        {availableTopographyCases.map((inv) => (
+                          <option key={inv.id} value={inv.id}>
+                            {inv.caseId}: {inv.title.slice(0, 35)} ({inv.blockchain})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowModal(true)}
+                      style={{
+                        padding: '7px 16px',
+                        background: 'var(--accent)',
+                        border: 'none',
+                        borderRadius: '6px',
+                        color: '#fff',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      + Start New Investigation
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

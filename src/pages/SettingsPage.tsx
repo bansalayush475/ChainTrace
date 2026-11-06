@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useStore } from '../store/useStore';
+import { api } from '../services/apiService';
 import {
   CheckCircle,
   ShieldCheck,
@@ -230,6 +231,14 @@ export default function SettingsPage() {
 
       // Persist password hash string to user profile
       updateUser({ passwordHash });
+
+      if (user?.email || email) {
+        await api.updateProfile({
+          email: user?.email || email,
+          password: newPassword,
+          passwordHash,
+        });
+      }
 
       addAuditLog({
         user: user?.name || name || 'Investigator',

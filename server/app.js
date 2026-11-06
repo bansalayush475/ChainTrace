@@ -37,6 +37,7 @@ import evidenceRouter from './routes/evidence.js';
 import authRouter from './routes/auth.js';
 import blockchainRouter from './routes/blockchain.js';
 import mlRouter from './routes/ml.js';
+import emailRouter from './routes/email.js';
 
 const app = express();
 
@@ -70,6 +71,7 @@ app.use('/api/transactions', transactionsRouter);
 app.use('/api/evidence', evidenceRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/ml', mlRouter);
+app.use('/api/email', emailRouter);
 
 // Root API ping
 app.get('/api', (req, res) => {
