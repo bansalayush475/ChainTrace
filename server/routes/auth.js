@@ -202,19 +202,38 @@ router.post('/login', async (req, res) => {
       }
     }
 
-    // MFA OTP verification if OTP was dispatched
-    if (otp) {
-      const enteredOtp = otp.trim();
-      const record = otpStore.get(cleanEmail);
-      if (record) {
-        if (Date.now() > record.expiresAt) {
-          return res.status(400).json({ error: 'MFA OTP has expired. Please request a new OTP to your email.' });
-        }
-        if (record.code !== enteredOtp) {
-          return res.status(401).json({ error: 'Invalid MFA OTP. Please check the 6-digit code sent to your official email.' });
-        }
-      }
+    // Strict MFA OTP Enforcement: Login is prohibited without matching valid OTP
+    if (!otp || !String(otp).trim()) {
+      return res.status(401).json({
+        error: 'MFA Security OTP is mandatory for login. Please click "Send OTP" to receive your 6-digit verification code.',
+      });
     }
+
+    const enteredOtp = String(otp).trim();
+    const record = otpStore.get(cleanEmail);
+
+    if (!record) {
+      return res.status(401).json({
+        error: 'No active OTP found for this account. Please click "Send OTP" to receive a verification code on your email.',
+      });
+    }
+
+    if (Date.now() > record.expiresAt) {
+      otpStore.delete(cleanEmail);
+      return res.status(401).json({
+        error: 'MFA OTP code has expired. Please request a new 6-digit verification code.',
+      });
+    }
+
+    if (record.code !== enteredOtp) {
+      record.attempts = (record.attempts || 0) + 1;
+      return res.status(401).json({
+        error: 'Invalid MFA OTP code. The entered code does not match the OTP sent to your email.',
+      });
+    }
+
+    // OTP verified successfully - consume OTP so it cannot be reused
+    otpStore.delete(cleanEmail);
 
     await db.updateUserLogin(cleanEmail);
 
@@ -240,13 +259,21 @@ router.post('/login', async (req, res) => {
 // PUT /api/auth/profile
 router.put('/profile', async (req, res) => {
   try {
-    const { email, ...updates } = req.body;
-    if (!email) {
-      return res.status(400).json({ error: 'Officer email is required' });
+    const { email, oldEmail, previousEmail, newEmail, id, ...updates } = req.body;
+    const lookupEmail = (oldEmail || previousEmail || email || '').toLowerCase().trim();
+    const targetNewEmail = (newEmail || email || lookupEmail || '').toLowerCase().trim();
+
+    if (!lookupEmail && !targetNewEmail && !id) {
+      return res.status(400).json({ error: 'Officer email or ID is required' });
     }
 
-    const cleanEmail = email.toLowerCase().trim();
-    const updatedUser = await db.updateUserProfile(cleanEmail, updates);
+    const updatedUser = await db.updateUserProfile(lookupEmail || targetNewEmail, {
+      ...updates,
+      id,
+      email: targetNewEmail,
+      newEmail: targetNewEmail,
+      oldEmail: lookupEmail,
+    });
 
     if (!updatedUser) {
       return res.status(404).json({ error: 'Officer account not found' });
@@ -265,13 +292,21 @@ router.put('/profile', async (req, res) => {
 // POST /api/auth/profile (alias for client environments that restrict PUT)
 router.post('/profile', async (req, res) => {
   try {
-    const { email, ...updates } = req.body;
-    if (!email) {
-      return res.status(400).json({ error: 'Officer email is required' });
+    const { email, oldEmail, previousEmail, newEmail, id, ...updates } = req.body;
+    const lookupEmail = (oldEmail || previousEmail || email || '').toLowerCase().trim();
+    const targetNewEmail = (newEmail || email || lookupEmail || '').toLowerCase().trim();
+
+    if (!lookupEmail && !targetNewEmail && !id) {
+      return res.status(400).json({ error: 'Officer email or ID is required' });
     }
 
-    const cleanEmail = email.toLowerCase().trim();
-    const updatedUser = await db.updateUserProfile(cleanEmail, updates);
+    const updatedUser = await db.updateUserProfile(lookupEmail || targetNewEmail, {
+      ...updates,
+      id,
+      email: targetNewEmail,
+      newEmail: targetNewEmail,
+      oldEmail: lookupEmail,
+    });
 
     if (!updatedUser) {
       return res.status(404).json({ error: 'Officer account not found' });

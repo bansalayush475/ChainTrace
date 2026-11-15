@@ -370,24 +370,28 @@ class ApiService {
       if (msg.includes('404') || msg.includes('could not be found') || msg.includes('Failed to fetch')) {
         const cleanEmail = credentials.email.trim().toLowerCase();
 
-        // Enforce OTP validation in fallback mode if an OTP was sent
-        const rawOtpData = typeof window !== 'undefined' ? sessionStorage.getItem(`cbfis_otp_${cleanEmail}`) : null;
-        if (rawOtpData) {
-          try {
-            const data = JSON.parse(rawOtpData);
-            if (!credentials.otp) {
-              throw new Error('OTP is required for login. Please check your email.');
-            }
-            if (data.code !== credentials.otp.trim()) {
-              throw new Error('Invalid OTP code. Please check your email and try again.');
-            }
-            if (Date.now() > data.expiresAt) {
-              throw new Error('OTP has expired. Please request a new one.');
-            }
-          } catch (e: any) {
-             if(e.message.includes('OTP')) throw e;
-          }
+        // Strict MFA OTP verification: cannot login without matching OTP
+        if (!credentials.otp || !credentials.otp.trim()) {
+          throw new Error('MFA Security OTP is mandatory for login. Please request and enter your 6-digit OTP code.');
         }
+        const rawOtpData = typeof window !== 'undefined' ? sessionStorage.getItem(`cbfis_otp_${cleanEmail}`) : null;
+        if (!rawOtpData) {
+          throw new Error('No active OTP found for this account. Please click "Send OTP" to receive your verification code.');
+        }
+        let data: any = {};
+        try {
+          data = JSON.parse(rawOtpData);
+        } catch {
+          throw new Error('Corrupted OTP session. Please request a new OTP code.');
+        }
+        if (Date.now() > (data.expiresAt || 0)) {
+          if (typeof window !== 'undefined') sessionStorage.removeItem(`cbfis_otp_${cleanEmail}`);
+          throw new Error('MFA OTP has expired. Please request a new 6-digit verification code.');
+        }
+        if (data.code !== credentials.otp.trim()) {
+          throw new Error('Invalid MFA OTP code. The entered code does not match the OTP sent to your email.');
+        }
+        if (typeof window !== 'undefined') sessionStorage.removeItem(`cbfis_otp_${cleanEmail}`);
         const officers = getStoredLocalOfficers();
         let officer = officers.find((o) => o.email.toLowerCase() === cleanEmail);
         if (!officer) {

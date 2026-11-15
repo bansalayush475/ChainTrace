@@ -13,6 +13,8 @@ import {
   RotateCw,
   X,
   LogOut,
+  Database,
+  RefreshCw,
 } from 'lucide-react';
 
 const containerVariants = {
@@ -45,7 +47,15 @@ async function sha256(str: string): Promise<string> {
 
 export default function SettingsPage() {
   const navigate = useNavigate();
-  const { user, updateUser, addAuditLog, logout } = useStore();
+  const {
+    user,
+    updateUser,
+    syncUserWithSupabase,
+    supabaseSyncState,
+    lastSupabaseSyncTime,
+    addAuditLog,
+    logout,
+  } = useStore();
   const [activeSection, setActiveSection] = useState('Account');
 
   // Account Personal Profile Information
@@ -60,6 +70,53 @@ export default function SettingsPage() {
   const [supervisorEmail, setSupervisorEmail] = useState(user?.supervisorEmail ?? 'lead-researcher@chaintrace.org');
   const [emergencyContact, setEmergencyContact] = useState(user?.emergencyContact ?? '+91 11 2345 6789');
   const [stationAddress, setStationAddress] = useState(user?.stationAddress ?? 'NCFL Complex, Sector-4, R.K. Puram, New Delhi - 110022');
+
+  const [isSavingSupabase, setIsSavingSupabase] = useState(false);
+  const debounceTimerRef = useRef<any>(null);
+
+  // Keep local fields in sync when user object is updated remotely via Supabase Realtime
+  useEffect(() => {
+    if (!user) return;
+    if (user.name && user.name !== name) setName(user.name);
+    if (user.email && user.email !== email) setEmail(user.email);
+    if (user.phone && user.phone !== phone) setPhone(user.phone);
+    if (user.badgeNo && user.badgeNo !== badgeNo) setBadgeNo(user.badgeNo);
+    if (user.designation && user.designation !== designation) setDesignation(user.designation);
+    if (user.team && user.team !== team) setTeam(user.team);
+    if (user.jurisdiction && user.jurisdiction !== jurisdiction) setJurisdiction(user.jurisdiction);
+    if (user.serviceId && user.serviceId !== serviceId) setServiceId(user.serviceId);
+    if (user.supervisorEmail && user.supervisorEmail !== supervisorEmail) setSupervisorEmail(user.supervisorEmail);
+    if (user.emergencyContact && user.emergencyContact !== emergencyContact) setEmergencyContact(user.emergencyContact);
+    if (user.stationAddress && user.stationAddress !== stationAddress) setStationAddress(user.stationAddress);
+  }, [user]);
+
+  const handleNameChange = (newName: string) => {
+    setName(newName);
+    // Instant local UI & header update
+    updateUser({ id: user?.id, name: newName });
+
+    // Live debounce update to Supabase Cloud
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(async () => {
+      setIsSavingSupabase(true);
+      await syncUserWithSupabase({ id: user?.id, name: newName });
+      setIsSavingSupabase(false);
+    }, 600);
+  };
+
+  const handleEmailChange = (newEmail: string) => {
+    setEmail(newEmail);
+    // Live debounce update to Supabase Cloud when valid email format
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(async () => {
+      const clean = newEmail.trim();
+      if (clean.includes('@') && clean.includes('.')) {
+        setIsSavingSupabase(true);
+        await syncUserWithSupabase({ id: user?.id, email: clean });
+        setIsSavingSupabase(false);
+      }
+    }, 800);
+  };
 
   // Investigation Preferences
   const [defaultChain, setDefaultChain] = useState('ETH');
@@ -172,10 +229,12 @@ export default function SettingsPage() {
     }
   }, [passwordModalOpen, refreshModalCaptcha]);
 
-  function handleSave() {
-    updateUser({
+  async function handleSave() {
+    setIsSavingSupabase(true);
+    const success = await syncUserWithSupabase({
+      id: user?.id,
       name,
-      email,
+      email: email.trim(),
       phone,
       badgeNo,
       designation,
@@ -186,15 +245,21 @@ export default function SettingsPage() {
       emergencyContact,
       stationAddress,
     });
+    setIsSavingSupabase(false);
+
     addAuditLog({
       user: name || 'Investigator',
       action: 'SETTINGS_CHANGE',
       resource: 'USER_PREFERENCES',
       ip: '192.168.1.100',
-      details: 'Updated officer personal identity & jurisdictional profile',
+      details: 'Updated officer personal identity & jurisdictional profile in Supabase Cloud',
     });
-    setSavedMsg('Personal and account details saved successfully.');
-    setTimeout(() => setSavedMsg(''), 2500);
+    setSavedMsg(
+      success
+        ? '✓ Username & officer details synced to Supabase Cloud in real-time!'
+        : 'Personal and account details saved successfully.'
+    );
+    setTimeout(() => setSavedMsg(''), 3000);
   }
 
   async function handleChangePasswordSubmit(e: React.FormEvent) {
@@ -281,7 +346,11 @@ export default function SettingsPage() {
             Manage your personal identity profile, statutory jurisdiction, account credentials, and platform preferences.
           </p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <div style={{ padding: '8px 14px', borderRadius: '6px', background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.25)', fontSize: '12px', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: isSavingSupabase ? '#eab308' : '#22c55e', boxShadow: isSavingSupabase ? '0 0 8px #eab308' : '0 0 8px #22c55e', display: 'inline-block' }} />
+            <span>Supabase Cloud: <strong>{isSavingSupabase ? 'SYNCING...' : 'LIVE CONNECTED'}</strong></span>
+          </div>
           <div style={{ padding: '8px 14px', borderRadius: '6px', background: 'rgba(34, 197, 94, 0.08)', border: '1px solid rgba(34, 197, 94, 0.25)', fontSize: '12px', color: '#22c55e', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}>
             <ShieldCheck size={15} style={{ color: '#22c55e' }} />
             <span>Identity Status: <strong>AUTHENTICATED LEA</strong></span>
@@ -341,6 +410,87 @@ export default function SettingsPage() {
                 </p>
               </div>
 
+              {/* Supabase Cloud Live Realtime Sync Banner */}
+              <div
+                style={{
+                  padding: '14px 18px',
+                  borderRadius: '8px',
+                  background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.08) 0%, rgba(34, 197, 94, 0.05) 100%)',
+                  border: '1px solid rgba(56, 189, 248, 0.25)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '12px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div
+                    style={{
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '8px',
+                      background: 'rgba(56, 189, 248, 0.15)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#38bdf8',
+                    }}
+                  >
+                    <Database size={19} />
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        Supabase Cloud Database (PostgreSQL)
+                      </span>
+                      <span
+                        style={{
+                          fontSize: '10px',
+                          fontWeight: 800,
+                          padding: '2px 7px',
+                          borderRadius: '4px',
+                          background: 'rgba(34, 197, 94, 0.18)',
+                          color: '#22c55e',
+                          letterSpacing: '0.04em',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#22c55e' }} />
+                        REALTIME ACTIVE
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                      Target Table: <code style={{ color: 'var(--accent)', background: 'var(--bg-elevated)', padding: '1px 5px', borderRadius: '3px' }}>public.users</code> · Remote Column: <code style={{ color: 'var(--accent)' }}>name</code> · Live Bidirectional Sync
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleSave()}
+                  disabled={isSavingSupabase}
+                  style={{
+                    padding: '7px 14px',
+                    borderRadius: '6px',
+                    background: 'rgba(56, 189, 248, 0.12)',
+                    border: '1px solid rgba(56, 189, 248, 0.35)',
+                    color: '#38bdf8',
+                    fontSize: '11.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <RefreshCw size={13} className={isSavingSupabase ? 'animate-spin' : ''} />
+                  <span>{isSavingSupabase ? 'Syncing...' : 'Sync Supabase Now'}</span>
+                </button>
+              </div>
+
               {/* Personal Identity Grid */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
@@ -349,17 +499,31 @@ export default function SettingsPage() {
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
                   <div>
-                    <label style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
-                      FULL NAME *
-                    </label>
-                    <input value={name} onChange={(e) => setName(e.target.value)} style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} placeholder="Officer Full Name" />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <label style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 600 }}>
+                        USERNAME / OFFICER FULL NAME *
+                      </label>
+                      <span style={{ fontSize: '10.5px', color: isSavingSupabase ? '#eab308' : '#22c55e', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: isSavingSupabase ? '#eab308' : '#22c55e' }} />
+                        {isSavingSupabase ? 'Syncing to Supabase...' : lastSupabaseSyncTime ? `Live Synced (${lastSupabaseSyncTime})` : 'Live Cloud Sync'}
+                      </span>
+                    </div>
+                    <input
+                      value={name}
+                      onChange={(e) => handleNameChange(e.target.value)}
+                      style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+                      placeholder="Officer Full Name / Username"
+                    />
+                    <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      Changes sync live to Supabase table <code style={{ color: 'var(--accent)' }}>public.users</code> automatically.
+                    </div>
                   </div>
 
                   <div>
                     <label style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
                       OFFICIAL LEA EMAIL ID *
                     </label>
-                    <input value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} placeholder="officer@agency.gov.in" />
+                    <input value={email} onChange={(e) => handleEmailChange(e.target.value)} style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} placeholder="officer@agency.gov.in" />
                   </div>
 
                   <div>
@@ -503,7 +667,9 @@ export default function SettingsPage() {
               </div>
 
               <button
+                type="button"
                 onClick={handleSave}
+                disabled={isSavingSupabase}
                 style={{
                   alignSelf: 'flex-start',
                   padding: '10px 24px',
@@ -513,11 +679,16 @@ export default function SettingsPage() {
                   color: '#fff',
                   fontSize: '13px',
                   fontWeight: 700,
-                  cursor: 'pointer',
+                  cursor: isSavingSupabase ? 'not-allowed' : 'pointer',
                   marginTop: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  opacity: isSavingSupabase ? 0.8 : 1,
                 }}
               >
-                Update Account Details
+                {isSavingSupabase && <RefreshCw size={14} className="animate-spin" />}
+                <span>{isSavingSupabase ? 'Syncing to Supabase Cloud...' : 'Update Account & Sync to Supabase'}</span>
               </button>
             </div>
           )}

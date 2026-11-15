@@ -25,7 +25,14 @@ CREATE TABLE IF NOT EXISTS users (
     badge_no VARCHAR(128),
     jurisdiction VARCHAR(128) DEFAULT 'Delhi Police Cyber Crime PS (Special Cell)',
     avatar VARCHAR(16) DEFAULT 'CF',
+    phone VARCHAR(64),
+    emergency_contact VARCHAR(64),
+    designation VARCHAR(128),
+    service_id VARCHAR(128),
+    supervisor_email VARCHAR(128),
+    station_address TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
     last_login TIMESTAMPTZ
 );
 
@@ -33,6 +40,26 @@ ALTER TABLE users ALTER COLUMN id TYPE VARCHAR(128);
 ALTER TABLE users ALTER COLUMN role TYPE VARCHAR(128);
 ALTER TABLE users ALTER COLUMN clearance_level TYPE VARCHAR(128);
 ALTER TABLE users ALTER COLUMN badge_no TYPE VARCHAR(128);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(64);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS emergency_contact VARCHAR(64);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS designation VARCHAR(128);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS service_id VARCHAR(128);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS supervisor_email VARCHAR(128);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS station_address TEXT;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'users'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE users;
+  END IF;
+EXCEPTION WHEN OTHERS THEN
+  -- Silent fallback if publication is managed externally
+  NULL;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_team ON users(team);
@@ -85,6 +112,7 @@ CREATE TABLE IF NOT EXISTS timeline_events (
 
 ALTER TABLE timeline_events ALTER COLUMN id TYPE VARCHAR(128);
 ALTER TABLE timeline_events ALTER COLUMN investigation_id TYPE VARCHAR(128);
+ALTER TABLE timeline_events DROP CONSTRAINT IF EXISTS timeline_events_investigation_id_fkey;
 
 CREATE INDEX IF NOT EXISTS idx_timeline_investigation_id ON timeline_events(investigation_id);
 CREATE INDEX IF NOT EXISTS idx_timeline_timestamp ON timeline_events(timestamp DESC);
@@ -94,9 +122,24 @@ CREATE INDEX IF NOT EXISTS idx_timeline_timestamp ON timeline_events(timestamp D
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS evidence_vault (
     id VARCHAR(128) PRIMARY KEY,
-    investigation_id VARCHAR(128) REFERENCES investigations(id) ON DELETE CASCADE,
+    investigation_id VARCHAR(128),
     title VARCHAR(255) NOT NULL,
-    type VARCHAR(32) NOT NULL CHECK (type IN ('TRANSACTION_RECEIPT', 'WALLET_SNAPSHOT', 'GRAPH_EXPORT', 'STATUTORY_NOTICE', 'EXCHANGE_SUBPOENA', 'FORENSIC_REPORT', 'CHAIN_ANALYSIS')),
+    type VARCHAR(64) NOT NULL,
+    hash VARCHAR(128) NOT NULL,
+    file_size VARCHAR(32) NOT NULL DEFAULT '128 KB',
+    source VARCHAR(128) NOT NULL DEFAULT 'Sovereign Node RPC',
+    description TEXT,
+    examiner_name VARCHAR(128) NOT NULL DEFAULT 'Examiner of Electronic Evidence (Sec 79A IT Act)',
+    verified BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Alias table 'evidence' for direct compatibility
+CREATE TABLE IF NOT EXISTS evidence (
+    id VARCHAR(128) PRIMARY KEY,
+    investigation_id VARCHAR(128),
+    title VARCHAR(255) NOT NULL,
+    type VARCHAR(64) NOT NULL,
     hash VARCHAR(128) NOT NULL,
     file_size VARCHAR(32) NOT NULL DEFAULT '128 KB',
     source VARCHAR(128) NOT NULL DEFAULT 'Sovereign Node RPC',
@@ -109,9 +152,58 @@ CREATE TABLE IF NOT EXISTS evidence_vault (
 ALTER TABLE evidence_vault ALTER COLUMN id TYPE VARCHAR(128);
 ALTER TABLE evidence_vault ALTER COLUMN investigation_id TYPE VARCHAR(128);
 ALTER TABLE evidence_vault ALTER COLUMN hash TYPE VARCHAR(128);
+ALTER TABLE evidence_vault ALTER COLUMN type TYPE VARCHAR(64);
+ALTER TABLE evidence_vault DROP CONSTRAINT IF EXISTS evidence_vault_type_check;
+ALTER TABLE evidence_vault DROP CONSTRAINT IF EXISTS evidence_vault_investigation_id_fkey;
 
 CREATE INDEX IF NOT EXISTS idx_evidence_investigation ON evidence_vault(investigation_id);
 CREATE INDEX IF NOT EXISTS idx_evidence_hash ON evidence_vault(hash);
+
+-- Safe Replica Identity & Constraints
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users') THEN
+    ALTER TABLE users REPLICA IDENTITY FULL;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'investigations') THEN
+    ALTER TABLE investigations REPLICA IDENTITY FULL;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'timeline_events') THEN
+    ALTER TABLE timeline_events REPLICA IDENTITY FULL;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'evidence_vault') THEN
+    ALTER TABLE evidence_vault REPLICA IDENTITY FULL;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'evidence') THEN
+    ALTER TABLE evidence REPLICA IDENTITY FULL;
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users') AND
+     NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'users') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE users;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'investigations') AND
+     NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'investigations') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE investigations;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'timeline_events') AND
+     NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'timeline_events') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE timeline_events;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'evidence_vault') AND
+     NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'evidence_vault') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE evidence_vault;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'evidence') AND
+     NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'evidence') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE evidence;
+  END IF;
+EXCEPTION WHEN OTHERS THEN
+  NULL;
+END $$;
 
 -- ==============================================================================
 -- 5. WALLET INTELLIGENCE PROFILES TABLE

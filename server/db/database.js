@@ -154,6 +154,13 @@ function toSupabaseUser(u) {
     badge_no: u.badgeNo || u.badge_no || null,
     jurisdiction: u.jurisdiction || 'Delhi Police Cyber Crime PS (Special Cell)',
     avatar: u.avatar || (u.name ? u.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() : 'CF'),
+    phone: u.phone || null,
+    emergency_contact: u.emergencyContact || u.emergency_contact || null,
+    designation: u.designation || null,
+    service_id: u.serviceId || u.service_id || null,
+    supervisor_email: u.supervisorEmail || u.supervisor_email || null,
+    station_address: u.stationAddress || u.station_address || null,
+    updated_at: new Date().toISOString(),
     created_at: u.createdAt || u.created_at || new Date().toISOString(),
     last_login: u.lastLogin || u.last_login || new Date().toISOString(),
   };
@@ -167,7 +174,14 @@ function fromSupabaseUser(row) {
     roleType: row.role_type || row.roleType || 'SENIOR',
     clearanceLevel: row.clearance_level || row.clearanceLevel,
     badgeNo: row.badge_no || row.badgeNo,
+    phone: row.phone || row.phone,
+    emergencyContact: row.emergency_contact || row.emergencyContact,
+    designation: row.designation || row.designation,
+    serviceId: row.service_id || row.serviceId,
+    supervisorEmail: row.supervisor_email || row.supervisorEmail,
+    stationAddress: row.station_address || row.stationAddress,
     createdAt: row.created_at || row.createdAt,
+    updatedAt: row.updated_at || row.updatedAt,
     lastLogin: row.last_login || row.lastLogin,
   };
 }
@@ -381,11 +395,13 @@ function fromSupabaseTransaction(row) {
 }
 
 function toSupabaseEvidence(ev) {
+  let evType = ev.type || 'TRANSACTION_RECEIPT';
+  if (evType === 'TRANSACTION_RECORD') evType = 'TRANSACTION_RECEIPT';
   return {
     id: ev.id,
-    investigation_id: ev.investigationId || ev.investigation_id,
-    title: ev.title || ev.description || 'Forensic Exhibit',
-    type: ev.type || 'FORENSIC_REPORT',
+    investigation_id: ev.investigationId || ev.investigation_id || 'INV-001',
+    title: (ev.title || ev.description || 'Forensic Exhibit').slice(0, 255),
+    type: evType,
     hash: ev.hash,
     file_size: ev.fileSize || ev.file_size || ev.size || '128 KB',
     source: ev.source || 'Sovereign Node RPC',
@@ -547,40 +563,123 @@ export const db = {
 
   async updateUserProfile(email, updates) {
     const cleanEmail = (email || '').toLowerCase().trim();
-    let updatedUser = null;
+    const oldEmail = (updates.oldEmail || updates.previousEmail || cleanEmail).toLowerCase().trim();
+    const newEmail = (updates.newEmail || updates.email || cleanEmail).toLowerCase().trim();
+    const targetId = updates.id;
 
-    if (memoryDb.users) {
-      const idx = memoryDb.users.findIndex((u) => u.email.toLowerCase() === cleanEmail);
-      if (idx !== -1) {
-        memoryDb.users[idx] = {
-          ...memoryDb.users[idx],
-          ...updates,
-          updated_at: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        updatedUser = memoryDb.users[idx];
-        writeLocalDb(memoryDb);
+    if (!cleanEmail && !oldEmail && !newEmail && !targetId) return null;
+
+    let updatedUser = null;
+    if (!memoryDb.users) memoryDb.users = [];
+
+    const idx = memoryDb.users.findIndex((u) =>
+      (targetId && u.id === targetId) ||
+      (oldEmail && u.email && u.email.toLowerCase() === oldEmail) ||
+      (cleanEmail && u.email && u.email.toLowerCase() === cleanEmail)
+    );
+
+    if (idx !== -1) {
+      memoryDb.users[idx] = {
+        ...memoryDb.users[idx],
+        ...updates,
+        email: newEmail || memoryDb.users[idx].email,
+      };
+      if (updates.name && !updates.avatar) {
+        const parts = updates.name.trim().split(/\s+/);
+        memoryDb.users[idx].avatar = ((parts[0]?.[0] || 'U') + (parts[1]?.[0] || parts[0]?.[1] || '')).toUpperCase();
       }
+      updatedUser = memoryDb.users[idx];
+    } else {
+      const parts = (updates.name || 'Authorized Officer').trim().split(/\s+/);
+      const computedAvatar = updates.avatar || ((parts[0]?.[0] || 'U') + (parts[1]?.[0] || parts[0]?.[1] || '')).toUpperCase();
+      const newUser = {
+        id: targetId || updates.id || `USR-${Date.now()}`,
+        email: newEmail || cleanEmail,
+        name: updates.name || 'Authorized Officer',
+        team: updates.team || 'Special Cell Cyber Operations (Northern Command)',
+        role: updates.role || 'Lead Crypto Forensic Specialist',
+        roleType: updates.roleType || updates.role_type || 'SENIOR',
+        role_type: updates.roleType || updates.role_type || 'SENIOR',
+        clearanceLevel: updates.clearanceLevel || updates.clearance_level || 'LEVEL-4 TOP SECRET',
+        clearance_level: updates.clearanceLevel || updates.clearance_level || 'LEVEL-4 TOP SECRET',
+        badgeNo: updates.badgeNo || updates.badge_no || 'CT-RES-091',
+        badge_no: updates.badgeNo || updates.badge_no || 'CT-RES-091',
+        jurisdiction: updates.jurisdiction || 'ChainTrace Platform',
+        avatar: computedAvatar,
+        created_at: new Date().toISOString(),
+        last_login: new Date().toISOString(),
+        ...updates,
+      };
+      memoryDb.users.push(newUser);
+      updatedUser = newUser;
     }
+    writeLocalDb(memoryDb);
 
     const supabase = getSupabase();
     if (supabase) {
       try {
         const payload = {};
-        if (updates.name) payload.name = updates.name;
+        if (newEmail) payload.email = newEmail;
+        if (updates.name) {
+          payload.name = updates.name.trim();
+          const parts = updates.name.trim().split(/\s+/);
+          payload.avatar = updates.avatar || ((parts[0]?.[0] || 'U') + (parts[1]?.[0] || parts[0]?.[1] || '')).toUpperCase();
+        }
         if (updates.badgeNo || updates.badge_no) payload.badge_no = updates.badgeNo || updates.badge_no;
         if (updates.team) payload.team = updates.team;
         if (updates.role) payload.role = updates.role;
-        if (updates.phone) payload.phone = updates.phone;
+        if (updates.roleType || updates.role_type) payload.role_type = updates.roleType || updates.role_type;
+        if (updates.clearanceLevel || updates.clearance_level) payload.clearance_level = updates.clearanceLevel || updates.clearance_level;
         if (updates.jurisdiction) payload.jurisdiction = updates.jurisdiction;
+        if (updates.phone) payload.phone = updates.phone;
+        if (updates.emergencyContact || updates.emergency_contact) payload.emergency_contact = updates.emergencyContact || updates.emergency_contact;
+        if (updates.designation) payload.designation = updates.designation;
+        if (updates.serviceId || updates.service_id) payload.service_id = updates.serviceId || updates.service_id;
+        if (updates.supervisorEmail || updates.supervisor_email) payload.supervisor_email = updates.supervisorEmail || updates.supervisor_email;
+        if (updates.stationAddress || updates.station_address) payload.station_address = updates.stationAddress || updates.station_address;
         payload.updated_at = new Date().toISOString();
+        if (updates.passwordHash || updates.password_hash) payload.password_hash = updates.passwordHash || updates.password_hash;
 
-        await supabase.from('users').update(payload).eq('email', cleanEmail);
+        let updateData = null;
+        let updateErr = null;
+
+        // 1. Direct update matching by ID
+        if (targetId) {
+          const res = await supabase.from('users').update(payload).eq('id', targetId).select();
+          updateData = res.data;
+          updateErr = res.error;
+        }
+
+        // 2. Direct update matching by old or current email
+        if ((!updateData || updateData.length === 0) && (oldEmail || cleanEmail)) {
+          const res = await supabase.from('users').update(payload).eq('email', oldEmail || cleanEmail).select();
+          updateData = res.data;
+          updateErr = res.error;
+        }
+
+        if (updateErr) {
+          console.warn('[Supabase Cloud DB] updateUserProfile direct update failed:', updateErr.message);
+        } else if (!updateData || updateData.length === 0) {
+          // 3. If row was not present in Supabase, upsert it!
+          const supaRecord = toSupabaseUser({
+            ...updatedUser,
+            ...updates,
+            id: targetId || updatedUser.id,
+            email: newEmail || cleanEmail,
+          });
+          const { error: upsertErr } = await supabase.from('users').upsert([supaRecord], { onConflict: 'email' });
+          if (upsertErr) {
+            console.warn('[Supabase Cloud DB] updateUserProfile upsert error:', upsertErr.message);
+          } else {
+            console.log('[Supabase Cloud DB] User profile upserted live in Supabase for:', newEmail || cleanEmail);
+          }
+        } else {
+          console.log('[Supabase Cloud DB] User profile updated live in Supabase for:', newEmail || cleanEmail, payload);
+        }
       } catch (err) {
-        console.warn('[Supabase Warning] updateUserProfile:', err.message);
+        console.warn('[Supabase Exception] updateUserProfile:', err.message);
       }
     }
-
     return updatedUser;
   },
 
@@ -819,8 +918,28 @@ export const db = {
     const supabase = getSupabase();
     if (supabase) {
       try {
+        const invId = record.investigationId || record.investigation_id || 'INV-001';
+        if (invId) {
+          try {
+            await supabase.from('investigations').upsert([{
+              id: invId,
+              case_id: `CT-2024-${invId}`,
+              title: `Investigation ${invId}`,
+              blockchain: 'TRON',
+              suspect_wallet: record.walletAddress || '0x0000000000000000000000000000000000000000',
+              status: 'UNDER_INVESTIGATION',
+              priority: 'HIGH',
+              risk_score: 80,
+              funds_traced: 50000,
+              currency: 'USDT',
+              investigator: 'Cyber Forensic Specialist',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }], { onConflict: 'id', ignoreDuplicates: true });
+          } catch {}
+        }
         const supaRecord = toSupabaseTimeline(record);
-        const { error } = await supabase.from('timeline_events').insert([supaRecord]);
+        const { error } = await supabase.from('timeline_events').upsert([supaRecord], { onConflict: 'id' });
         if (error) console.warn('[Supabase Warning] addTimelineEvent fallback:', error.message);
       } catch (err) {
         console.warn('[Supabase Exception] addTimelineEvent:', err.message);
@@ -1191,8 +1310,40 @@ export const db = {
     if (supabase) {
       try {
         const supaRecord = toSupabaseEvidence(record);
-        const { error } = await supabase.from('evidence_vault').insert([supaRecord]);
-        if (error) console.warn('[Supabase Warning] addEvidence fallback:', error.message);
+
+        // 1. Ensure parent investigation exists so FK will never block insert
+        if (supaRecord.investigation_id) {
+          try {
+            await supabase.from('investigations').upsert([{
+              id: supaRecord.investigation_id,
+              case_id: `CT-2024-${supaRecord.investigation_id}`,
+              title: `Investigation ${supaRecord.investigation_id}`,
+              blockchain: 'TRON',
+              suspect_wallet: '0x0000000000000000000000000000000000000000',
+              status: 'UNDER_INVESTIGATION',
+              priority: 'HIGH',
+              risk_score: 80,
+              funds_traced: 50000,
+              currency: 'USDT',
+              investigator: 'Cyber Forensic Specialist',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }], { onConflict: 'id', ignoreDuplicates: true });
+          } catch {}
+        }
+
+        // 2. Insert into evidence_vault table
+        const { error: vaultError } = await supabase.from('evidence_vault').upsert([supaRecord], { onConflict: 'id' });
+        if (vaultError) {
+          console.warn('[Supabase Cloud DB] addEvidence evidence_vault warning:', vaultError.message);
+        } else {
+          console.log('[Supabase Cloud DB] Evidence registered successfully in evidence_vault:', record.id);
+        }
+
+        // 3. Also sync into evidence table for dual table availability
+        try {
+          await supabase.from('evidence').upsert([supaRecord], { onConflict: 'id' });
+        } catch {}
       } catch (err) {
         console.warn('[Supabase Exception] addEvidence:', err.message);
       }

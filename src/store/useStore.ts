@@ -34,6 +34,18 @@ import {
   type DatabaseStats,
 } from "../services/databaseService";
 import { api } from "../services/apiService";
+import {
+  updateSupabaseUserProfile,
+  fetchSupabaseUserProfile,
+  subscribeToUserProfile,
+  addSupabaseEvidence,
+  fetchSupabaseEvidence,
+  addSupabaseTimelineEvent,
+  fetchSupabaseTimelineEvents,
+  addSupabaseInvestigation,
+  updateSupabaseInvestigation,
+  fetchSupabaseInvestigations,
+} from "../services/supabaseClient";
 
 export type {
   Investigation,
@@ -122,6 +134,9 @@ interface StoreState {
   toggleSidebar: () => void;
   toggleTheme: () => void;
   updateUser: (updates: Partial<User>) => void;
+  syncUserWithSupabase: (updates: Partial<User>) => Promise<boolean>;
+  supabaseSyncState: 'idle' | 'syncing' | 'synced' | 'error';
+  lastSupabaseSyncTime: string | null;
 
   // Investigation actions
   addInvestigation: (input: NewInvestigationInput) => Investigation;
@@ -217,6 +232,8 @@ export const useStore = create<StoreState>((set, get) => ({
   dbStats: null,
   supabaseStatus: null,
   isBackendConnected: false,
+  supabaseSyncState: 'synced',
+  lastSupabaseSyncTime: null,
 
   // Initial store state begins clean (0 records)
   investigations: [],
@@ -368,13 +385,99 @@ export const useStore = create<StoreState>((set, get) => ({
           localStorage.setItem('cbfis_active_session', JSON.stringify(updated));
         } catch {}
       }
+      return { 
+        user: updated,
+        supabaseSyncState: 'syncing',
+      };
+    });
+
+    const activeUser = get().user;
+    const oldEmail = activeUser?.email;
+    const newEmail = updates.email || oldEmail;
+    const userId = updates.id || activeUser?.id;
+
+    if (newEmail || oldEmail || userId) {
+      // 1. Direct Web SDK Supabase Cloud Live Sync
+      updateSupabaseUserProfile(newEmail || oldEmail || '', { ...payload, id: userId }, oldEmail, userId)
+        .then((res) => {
+          if (res.success) {
+            set({
+              supabaseSyncState: 'synced',
+              lastSupabaseSyncTime: new Date().toLocaleTimeString(),
+            });
+          }
+        })
+        .catch((err) => {
+          console.warn('[Store] Direct Supabase update error:', err);
+        });
+
+      // 2. Synchronize with backend API (updates backend DB & server-side Supabase)
+      api.updateProfile({ ...payload, id: userId, oldEmail, newEmail, email: newEmail })
+        .then((res) => {
+          if (res?.success) {
+            set({
+              supabaseSyncState: 'synced',
+              lastSupabaseSyncTime: new Date().toLocaleTimeString(),
+            });
+          }
+        })
+        .catch((err) => {
+          console.warn('[Store] Background profile update sync failed:', err);
+        });
+    }
+  },
+
+  syncUserWithSupabase: async (updates: Partial<User>): Promise<boolean> => {
+    const activeUser = get().user;
+    const oldEmail = activeUser?.email;
+    const newEmail = updates.email || oldEmail;
+    const userId = updates.id || activeUser?.id;
+    if (!newEmail && !oldEmail && !userId) return false;
+
+    set({ supabaseSyncState: 'syncing' });
+
+    let newAvatar = updates.avatar;
+    if (updates.name && !updates.avatar) {
+      const parts = updates.name.trim().split(/\s+/);
+      newAvatar = ((parts[0]?.[0] || 'U') + (parts[1]?.[0] || parts[0]?.[1] || '')).toUpperCase();
+    }
+
+    const payload = {
+      ...updates,
+      ...(newAvatar ? { avatar: newAvatar } : {}),
+    };
+
+    // Update local state immediately
+    set((s) => {
+      const updated = s.user ? { ...s.user, ...payload } : null;
+      if (updated && typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('cbfis_active_session', JSON.stringify(updated));
+        } catch {}
+      }
       return { user: updated };
     });
 
-    // Asynchronously synchronize profile name and fields with server/database
-    api.updateProfile(payload).catch((err) => {
-      console.warn('[Store] Background profile update sync failed:', err);
-    });
+    try {
+      const [directRes, apiRes] = await Promise.allSettled([
+        updateSupabaseUserProfile(newEmail || oldEmail || '', { ...payload, id: userId }, oldEmail, userId),
+        api.updateProfile({ ...payload, id: userId, oldEmail, newEmail, email: newEmail }),
+      ]);
+
+      const directOk = directRes.status === 'fulfilled' && directRes.value.success;
+      const apiOk = apiRes.status === 'fulfilled' && (apiRes.value as any)?.success;
+      const ok = directOk || apiOk;
+
+      set({
+        supabaseSyncState: ok ? 'synced' : 'error',
+        lastSupabaseSyncTime: ok ? new Date().toLocaleTimeString() : get().lastSupabaseSyncTime,
+      });
+
+      return ok;
+    } catch {
+      set({ supabaseSyncState: 'error' });
+      return false;
+    }
   },
 
   addInvestigation: (input) => {
@@ -461,6 +564,8 @@ export const useStore = create<StoreState>((set, get) => ({
 
     // Commit to Backend & Supabase
     api.createInvestigation(newInv).catch((err) => console.warn('Backend sync failed:', err));
+    addSupabaseInvestigation(newInv).catch((err) => console.warn('Supabase inv sync:', err));
+    addSupabaseTimelineEvent(initTimelineEvent).catch((err) => console.warn('Supabase timeline sync:', err));
 
     set((s) => ({
       investigations: [newInv, ...s.investigations],
@@ -480,6 +585,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const updatedInv = { ...target, ...updates, updatedAt: now };
       dbSaveInvestigation(updatedInv).catch(console.warn);
       api.updateInvestigation(id, updates).catch((err) => console.warn('Backend inv update sync:', err));
+      updateSupabaseInvestigation(id, updates).catch((err) => console.warn('Supabase inv update sync:', err));
 
       const auditEntry: AuditLog = {
         id: `LOG-${Date.now()}`,
@@ -509,6 +615,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const updatedInv = { ...target, status, updatedAt: now };
       dbSaveInvestigation(updatedInv).catch(console.warn);
       api.updateInvestigation(id, { status }).catch((err) => console.warn('Backend status update sync:', err));
+      updateSupabaseInvestigation(id, { status }).catch((err) => console.warn('Supabase status update sync:', err));
 
       const auditEntry: AuditLog = {
         id: `LOG-${Date.now()}`,
@@ -652,6 +759,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
     dbSaveEvidence(newEvidence).catch(console.warn);
     api.addEvidence(newEvidence).catch((err) => console.warn('Backend evidence sync:', err));
+    addSupabaseEvidence(newEvidence).catch((err) => console.warn('Supabase evidence sync:', err));
     dbGetStats().then((stats) => set({ dbStats: stats })).catch(() => {});
 
     set((state) => {
@@ -802,6 +910,7 @@ export const useStore = create<StoreState>((set, get) => ({
     if (event.investigationId) {
       api.addTimelineEvent(event.investigationId, newEvent).catch(console.warn);
     }
+    addSupabaseTimelineEvent(newEvent).catch((err) => console.warn('Supabase timeline event sync:', err));
     set((s) => ({
       timelineEvents: [newEvent, ...s.timelineEvents],
     }));
@@ -1030,6 +1139,27 @@ export const useStore = create<StoreState>((set, get) => ({
           evidence: Array.isArray(serverEvidence) ? serverEvidence : [],
           auditLogs: Array.isArray(serverAudit) ? serverAudit : [],
         });
+
+        // Hydrate latest user profile directly from Supabase Cloud
+        const activeOfficer = get().user;
+        if (activeOfficer?.email) {
+          fetchSupabaseUserProfile(activeOfficer.email).then((remoteUser) => {
+            if (remoteUser && remoteUser.name) {
+              set((s) => {
+                if (!s.user) return {};
+                const merged = { ...s.user, ...remoteUser };
+                try {
+                  localStorage.setItem('cbfis_active_session', JSON.stringify(merged));
+                } catch {}
+                return {
+                  user: merged,
+                  supabaseSyncState: 'synced',
+                  lastSupabaseSyncTime: new Date().toLocaleTimeString(),
+                };
+              });
+            }
+          }).catch(() => {});
+        }
       } catch {
         // Backend offline or local fallback
       }
@@ -1037,13 +1167,32 @@ export const useStore = create<StoreState>((set, get) => ({
       const hydrated = await dbSeedInitialIfEmpty();
       const stats = await dbGetStats();
 
+      // Direct Supabase Cloud Fetch to guarantee live data presence
+      try {
+        const [cloudInvs, cloudEvidence, cloudTimeline] = await Promise.all([
+          fetchSupabaseInvestigations().catch(() => []),
+          fetchSupabaseEvidence().catch(() => []),
+          fetchSupabaseTimelineEvents().catch(() => []),
+        ]);
+
+        if (cloudInvs && cloudInvs.length > 0) {
+          set({ investigations: cloudInvs });
+        }
+        if (cloudEvidence && cloudEvidence.length > 0) {
+          set({ evidence: cloudEvidence });
+        }
+        if (cloudTimeline && cloudTimeline.length > 0) {
+          set({ timelineEvents: cloudTimeline });
+        }
+      } catch {}
+
       set((s) => ({
-        investigations: s.isBackendConnected ? s.investigations : (hydrated.investigations || []),
-        evidence: s.isBackendConnected ? s.evidence : (hydrated.evidence || []),
+        investigations: s.investigations.length > 0 ? s.investigations : (hydrated.investigations || []),
+        evidence: s.evidence.length > 0 ? s.evidence : (hydrated.evidence || []),
         wallets: s.isBackendConnected ? s.wallets : (hydrated.wallets || []),
         transactions: s.isBackendConnected ? s.transactions : (hydrated.transactions || []),
         auditLogs: s.isBackendConnected ? s.auditLogs : (hydrated.auditLogs || []),
-        timelineEvents: s.isBackendConnected ? s.timelineEvents : (hydrated.timelineEvents || []),
+        timelineEvents: s.timelineEvents.length > 0 ? s.timelineEvents : (hydrated.timelineEvents || []),
         dbStats: stats,
         isDbReady: true,
       }));

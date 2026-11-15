@@ -808,11 +808,15 @@ export default function LoginPage() {
       return;
     }
 
+    if (!otp.trim()) {
+      setAuthError('MFA Security Code (OTP) is mandatory. Please click "Send OTP" and enter the 6-digit code sent to your email.');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // OTP is optional for dummy credentials and evaluation
-      const res = await api.login({ email: useEmail, password: usePass, otp: otp.trim() || undefined });
+      const res = await api.login({ email: useEmail, password: usePass, otp: otp.trim() });
       if (res.success && res.user) {
         login(res.user);
         navigate('/dashboard');
@@ -826,7 +830,7 @@ export default function LoginPage() {
         return;
       }
 
-      if (errMsg.includes('OTP') || errMsg.includes('otp')) {
+      if (errMsg.includes('OTP') || errMsg.includes('otp') || errMsg.includes('Security')) {
         setAuthError(errMsg);
         setLoading(false);
         return;
@@ -840,13 +844,7 @@ export default function LoginPage() {
         return;
       }
 
-      console.warn('[Login] Server error, attempting offline fallback:', errMsg);
-      if (lookupUser?.found) {
-        login(lookupUser as any);
-        navigate('/dashboard');
-      } else {
-        setAuthError('Unable to connect to the authentication server. Please check your network connection.');
-      }
+      setAuthError(errMsg || 'Authentication failed. Please check your credentials and ensure your OTP matches.');
     } finally {
       setLoading(false);
     }
