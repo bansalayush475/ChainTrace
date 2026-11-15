@@ -72,7 +72,8 @@ export default function SettingsPage() {
   const [stationAddress, setStationAddress] = useState(user?.stationAddress ?? 'NCFL Complex, Sector-4, R.K. Puram, New Delhi - 110022');
 
   const [isSavingSupabase, setIsSavingSupabase] = useState(false);
-  const debounceTimerRef = useRef<any>(null);
+  const nameDebounceRef = useRef<any>(null);
+  const emailDebounceRef = useRef<any>(null);
 
   // Keep local fields in sync when user object is updated remotely via Supabase Realtime
   useEffect(() => {
@@ -96,26 +97,46 @@ export default function SettingsPage() {
     updateUser({ id: user?.id, name: newName });
 
     // Live debounce update to Supabase Cloud
-    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    debounceTimerRef.current = setTimeout(async () => {
+    if (nameDebounceRef.current) clearTimeout(nameDebounceRef.current);
+    nameDebounceRef.current = setTimeout(async () => {
       setIsSavingSupabase(true);
       await syncUserWithSupabase({ id: user?.id, name: newName });
       setIsSavingSupabase(false);
     }, 600);
   };
 
+  const handleNameBlur = async () => {
+    const clean = name.trim();
+    if (clean && clean !== user?.name) {
+      if (nameDebounceRef.current) clearTimeout(nameDebounceRef.current);
+      setIsSavingSupabase(true);
+      await syncUserWithSupabase({ id: user?.id, name: clean });
+      setIsSavingSupabase(false);
+    }
+  };
+
   const handleEmailChange = (newEmail: string) => {
     setEmail(newEmail);
     // Live debounce update to Supabase Cloud when valid email format
-    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    debounceTimerRef.current = setTimeout(async () => {
-      const clean = newEmail.trim();
-      if (clean.includes('@') && clean.includes('.')) {
+    if (emailDebounceRef.current) clearTimeout(emailDebounceRef.current);
+    const clean = newEmail.trim();
+    if (clean.includes('@') && clean.includes('.')) {
+      emailDebounceRef.current = setTimeout(async () => {
         setIsSavingSupabase(true);
         await syncUserWithSupabase({ id: user?.id, email: clean });
         setIsSavingSupabase(false);
-      }
-    }, 800);
+      }, 700);
+    }
+  };
+
+  const handleEmailBlur = async () => {
+    const clean = email.trim();
+    if (clean && clean !== user?.email && clean.includes('@') && clean.includes('.')) {
+      if (emailDebounceRef.current) clearTimeout(emailDebounceRef.current);
+      setIsSavingSupabase(true);
+      await syncUserWithSupabase({ id: user?.id, email: clean });
+      setIsSavingSupabase(false);
+    }
   };
 
   // Investigation Preferences
@@ -231,10 +252,12 @@ export default function SettingsPage() {
 
   async function handleSave() {
     setIsSavingSupabase(true);
+    const cleanEmail = email.trim();
+    const validEmail = cleanEmail.includes('@') && cleanEmail.includes('.') ? cleanEmail : (user?.email || '');
     const success = await syncUserWithSupabase({
       id: user?.id,
-      name,
-      email: email.trim(),
+      name: name.trim() || user?.name || '',
+      email: validEmail,
       phone,
       badgeNo,
       designation,
@@ -511,6 +534,7 @@ export default function SettingsPage() {
                     <input
                       value={name}
                       onChange={(e) => handleNameChange(e.target.value)}
+                      onBlur={handleNameBlur}
                       style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
                       placeholder="Officer Full Name / Username"
                     />
@@ -523,21 +547,39 @@ export default function SettingsPage() {
                     <label style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
                       OFFICIAL LEA EMAIL ID *
                     </label>
-                    <input value={email} onChange={(e) => handleEmailChange(e.target.value)} style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} placeholder="officer@agency.gov.in" />
+                    <input
+                      value={email}
+                      onChange={(e) => handleEmailChange(e.target.value)}
+                      onBlur={handleEmailBlur}
+                      style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+                      placeholder="officer@agency.gov.in"
+                    />
                   </div>
 
                   <div>
                     <label style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
                       OFFICIAL MOBILE / CONTACT
                     </label>
-                    <input value={phone} onChange={(e) => setPhone(e.target.value)} style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} placeholder="+91 98765 43210" />
+                    <input
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      onBlur={() => { if (phone !== user?.phone) syncUserWithSupabase({ id: user?.id, phone }); }}
+                      style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+                      placeholder="+91 98765 43210"
+                    />
                   </div>
 
                   <div>
                     <label style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
                       EMERGENCY CONTACT PHONE
                     </label>
-                    <input value={emergencyContact} onChange={(e) => setEmergencyContact(e.target.value)} style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} placeholder="+91 11 2345 6789" />
+                    <input
+                      value={emergencyContact}
+                      onChange={(e) => setEmergencyContact(e.target.value)}
+                      onBlur={() => { if (emergencyContact !== user?.emergencyContact) syncUserWithSupabase({ id: user?.id, emergencyContact }); }}
+                      style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+                      placeholder="+91 11 2345 6789"
+                    />
                   </div>
                 </div>
               </div>
@@ -553,49 +595,91 @@ export default function SettingsPage() {
                     <label style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
                       BADGE / WARRANT NO.
                     </label>
-                    <input value={badgeNo} onChange={(e) => setBadgeNo(e.target.value)} style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} placeholder="CT-RES-091" />
+                    <input
+                      value={badgeNo}
+                      onChange={(e) => setBadgeNo(e.target.value)}
+                      onBlur={() => { if (badgeNo !== user?.badgeNo) syncUserWithSupabase({ id: user?.id, badgeNo }); }}
+                      style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+                      placeholder="CT-RES-091"
+                    />
                   </div>
 
                   <div>
                     <label style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
                       DESIGNATION / RANK
                     </label>
-                    <input value={designation} onChange={(e) => setDesignation(e.target.value)} style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} placeholder="Inspector / Lead Analyst" />
+                    <input
+                      value={designation}
+                      onChange={(e) => setDesignation(e.target.value)}
+                      onBlur={() => { if (designation !== user?.designation) syncUserWithSupabase({ id: user?.id, designation }); }}
+                      style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+                      placeholder="Inspector / Lead Analyst"
+                    />
                   </div>
 
                   <div>
                     <label style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
                       DEPARTMENT / UNIT
                     </label>
-                    <input value={team} onChange={(e) => setTeam(e.target.value)} style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} placeholder="Special Cell Cyber Operations" />
+                    <input
+                      value={team}
+                      onChange={(e) => setTeam(e.target.value)}
+                      onBlur={() => { if (team !== user?.team) syncUserWithSupabase({ id: user?.id, team }); }}
+                      style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+                      placeholder="Special Cell Cyber Operations"
+                    />
                   </div>
 
                   <div>
                     <label style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
                       GOVERNMENT SERVICE ID / PPO
                     </label>
-                    <input value={serviceId} onChange={(e) => setServiceId(e.target.value)} style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} placeholder="GOI-LEA-2024-8842" />
+                    <input
+                      value={serviceId}
+                      onChange={(e) => setServiceId(e.target.value)}
+                      onBlur={() => { if (serviceId !== user?.serviceId) syncUserWithSupabase({ id: user?.id, serviceId }); }}
+                      style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+                      placeholder="GOI-LEA-2024-8842"
+                    />
                   </div>
 
                   <div style={{ gridColumn: '1 / -1' }}>
                     <label style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
                       ASSIGNED RESEARCH TEAM / REGION
                     </label>
-                    <input value={jurisdiction} onChange={(e) => setJurisdiction(e.target.value)} style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} placeholder="ChainTrace Research Workspace" />
+                    <input
+                      value={jurisdiction}
+                      onChange={(e) => setJurisdiction(e.target.value)}
+                      onBlur={() => { if (jurisdiction !== user?.jurisdiction) syncUserWithSupabase({ id: user?.id, jurisdiction }); }}
+                      style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+                      placeholder="ChainTrace Research Workspace"
+                    />
                   </div>
 
                   <div style={{ gridColumn: '1 / -1' }}>
                     <label style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
                       ORGANIZATION / AFFILIATION
                     </label>
-                    <input value={stationAddress} onChange={(e) => setStationAddress(e.target.value)} style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} placeholder="NCFL Complex, Sector-4, New Delhi" />
+                    <input
+                      value={stationAddress}
+                      onChange={(e) => setStationAddress(e.target.value)}
+                      onBlur={() => { if (stationAddress !== user?.stationAddress) syncUserWithSupabase({ id: user?.id, stationAddress }); }}
+                      style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+                      placeholder="NCFL Complex, Sector-4, New Delhi"
+                    />
                   </div>
 
                   <div style={{ gridColumn: '1 / -1' }}>
                     <label style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
                       SUPERVISORY / REPORTING OFFICER EMAIL
                     </label>
-                    <input value={supervisorEmail} onChange={(e) => setSupervisorEmail(e.target.value)} style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} placeholder="lead-researcher@chaintrace.org" />
+                    <input
+                      value={supervisorEmail}
+                      onChange={(e) => setSupervisorEmail(e.target.value)}
+                      onBlur={() => { if (supervisorEmail !== user?.supervisorEmail) syncUserWithSupabase({ id: user?.id, supervisorEmail }); }}
+                      style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+                      placeholder="lead-researcher@chaintrace.org"
+                    />
                   </div>
                 </div>
               </div>
